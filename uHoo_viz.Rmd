@@ -1,0 +1,436 @@
+---
+title: "uHoo_viz"
+author: "Gabrielle"
+date: "2025-08-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+
+```
+
+## Puente Piedra Pollution Data via uHoo Devices
+
+Bar Plot of High and Low Temps by Device: emphasizes differences across devices
+
+Error Bars or Point Range Plot: visually summarizes the variability per device
+
+```{r temperature, echo=FALSE}
+# Create the temperature dataset
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(26.3, 26.9, 27.0, 27.4, 23.0, 24.8, 23.4, 23.7),
+  Low = c(21.8, 22.4, 23.0, 22.4, 19.6, 21.3, 20.5, 20.5)
+)
+
+# Average by device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "Temperature")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = Temperature, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low Temperature by Device",
+       x = "Device", y = "Temperature (°C)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot temperature range
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "Temperature Range by Device",
+       x = "Device", y = "Temperature (°C)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Long format with Day included
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "Temperature")
+
+ggplot(df_long2, aes(x = Day, y = Temperature, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "Temperature by Date and Device",
+       x = "Day", y = "Temperature (°C)") +
+  theme_minimal()
+
+
+```
+
+```{r humidity, echo=FALSE}
+# Manually entering the humidity data without % symbols
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(83.8, 90.5, 87.4, 89.8, 84.5, 86.3, 89.7, 89.3),
+  Low = c(65.7, 73.2, 72.7, 71.4, 69.9, 72.8, 77.5, 77.1)
+)
+
+# Average across days by device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "Humidity")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = Humidity, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low Humidity by Device",
+       x = "Device", y = "Humidity (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "Humidity Range by Device",
+       x = "Device", y = "Humidity (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape with Day preserved
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "Humidity")
+
+ggplot(df_long2, aes(x = Day, y = Humidity, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "Humidity by Date and Device",
+       x = "Day", y = "Humidity (%)") +
+  theme_minimal()
+```
+
+
+```{r carbon dioxide, echo=FALSE}
+
+# Enter CO₂ data, removing "ppm" and converting to numeric
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(581, 0, 840, 594, 549, 0, 714, 586),
+  Low = c(526, 0, 777, 542, 523, 0, 680, 542)
+)
+
+# Average across timepoints
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "CO2")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = CO2, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low CO2 Levels by Device",
+       x = "Device", y = "CO2 (ppm)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "CO2 Range by Device",
+       x = "Device", y = "CO2 (ppm)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape for plotting with Day and Type
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "CO2")
+
+ggplot(df_long2, aes(x = Day, y = CO2, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "CO2 Levels by Date and Device",
+       x = "Day", y = "CO2 (ppm)") +
+  theme_minimal()
+
+```
+
+
+```{r TOVC, echo=FALSE}
+
+# Manually entering and cleaning the data
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(1896, 2812, 208, 1986, 980, 10330, 870, 2792),
+  Low  = c(183, 1100, 2, 7, 0, 374, 2, 11)
+)
+
+# Average across dates per device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "TVOC")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = TVOC, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low TVOC by Device",
+       x = "Device", y = "TVOC (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "TVOC Range by Device",
+       x = "Device", y = "TVOC (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape with Day preserved
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "TVOC")
+
+ggplot(df_long2, aes(x = Day, y = TVOC, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "TVOC by Date and Device",
+       x = "Day", y = "TVOC (ppb)") +
+  theme_minimal()
+
+```
+
+
+```{r PM2.5, echo=FALSE}
+
+# Manually entering and cleaning the data
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(13, 12, 11, 8, 18, 30, 12, 13),
+  Low  = c(4, 4, 6, 2, 10, 11, 7, 6)
+)
+
+# Average across dates per device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "PM2_5")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = PM2_5, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low PM2.5 by Device",
+       x = "Device", y = "PM2.5 (µg/m³)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Point-range plot
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "PM2.5 Range by Device",
+       x = "Device", y = "PM2.5 (µg/m³)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape with Day preserved
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "PM2_5")
+
+# Line plot over time
+ggplot(df_long2, aes(x = Day, y = PM2_5, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "PM2.5 by Date and Device",
+       x = "Day", y = "PM2.5 (µg/m³)") +
+  theme_minimal()
+
+```
+
+
+```{r nitrogen dioxide, echo=FALSE}
+
+# Manually entering and cleaning the data
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(9, 77, 12, 1, 17, 58, 18, 33),
+  Low  = c(0, 0, 0, 0, 0, 1, 0, 0)
+)
+
+# Average across dates per device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "NO2")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = NO2, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low Nitrogen Dioxide by Device",
+       x = "Device", y = "NO2 (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Point-range plot
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "Nitrogen Dioxide Range by Device",
+       x = "Device", y = "NO2 (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape with Day preserved
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "NO2")
+
+# Line plot over time
+ggplot(df_long2, aes(x = Day, y = NO2, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "Nitrogen Dioxide by Date and Device",
+       x = "Day", y = "NO2 (ppb)") +
+  theme_minimal()
+
+```
+
+
+```{r carbon monoxide, echo=FALSE}
+
+# Manually entering and cleaning the data
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+  Low  = c(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+)
+
+# Average across dates per device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "CO")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = CO, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low Carbon Monoxide by Device",
+       x = "Device", y = "CO (ppm)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Point-range plot
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "Carbon Monoxide Range by Device",
+       x = "Device", y = "CO (ppm)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape with Day preserved
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "CO")
+
+# Line plot over time
+ggplot(df_long2, aes(x = Day, y = CO, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "Carbon Monoxide by Date and Device",
+       x = "Day", y = "CO (ppm)") +
+  theme_minimal()
+
+```
+
+
+```{r ozone, echo=FALSE}
+
+# Manually entering and cleaning the data
+df <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(7, 11, 8, 5, 8, 10, 8, 9),
+  Low  = c(3, 7, 6, 4, 6, 7, 5, 4)
+)
+
+# Average across dates per device
+df_summary <- df %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_long <- df_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "O3")
+
+# Bar plot
+ggplot(df_long, aes(x = Device, y = O3, fill = Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average High and Low Ozone by Device",
+       x = "Device", y = "O3 (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Point-range plot
+ggplot(df_summary, aes(x = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2)) +
+  labs(title = "Ozone Range by Device",
+       x = "Device", y = "O3 (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Reshape with Day preserved
+df_long2 <- df %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "O3")
+
+# Line plot over time
+ggplot(df_long2, aes(x = Day, y = O3, color = Type, group = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ Device) +
+  labs(title = "Ozone by Date and Device",
+       x = "Day", y = "O3 (ppb)") +
+  theme_minimal()
+
+```
+
