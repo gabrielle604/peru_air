@@ -19,7 +19,9 @@ library(tidyverse)
 
 Bar Plot of High and Low Temps by Device: emphasizes differences across devices
 
-Error Bars or Point Range Plot: visually summarizes the variability per device
+Point Range Plot: visually summarizes the variability per device
+
+Plot with dates included -- only analyzed Saturday, March 1st, 2025 & Tuesday, March 18th, 2025
 
 ```{r temperature, echo=FALSE}
 # Create the temperature dataset
