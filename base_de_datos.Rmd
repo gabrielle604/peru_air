@@ -1,0 +1,82 @@
+---
+title: "base_de_datos"
+author: "Gabrielle"
+date: "2025-08-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# install.packages("readxl")   # Run this once
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(tidyverse)
+```
+
+
+```{r load-data}
+# Load the first sheet
+base_monica <- read_excel("Base_de_datos_Monica.xlsx")
+
+base_uHoo <- read_excel("Base_de_datos_UHOO.xlsx")
+
+```
+
+## Merge the two files by numero de conglomerado o pin
+```{r}
+merged_data <- base_uHoo %>%
+  full_join(
+    base_monica,
+    by = c(
+      "Conglomerado o # de pin" = "var010",
+      "Sector"                 = "var009"
+    ),
+    relationship = "many-to-many"
+  )
+
+```
+
+## Exploring the data
+```{r}
+merged_data %>% 
+  select(Sector, `Conglomerado o # de pin`) %>% 
+  head(10)
+
+
+merged_data %>%
+  filter(!is.na(varn011), !is.na(var048)) %>%  # remove missing
+  group_by(varn011, var048) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(varn011) %>%
+  mutate(prop = count / sum(count)) %>%
+  ggplot(aes(x = varn011, y = prop, fill = var048)) +
+  geom_col(position = "fill") +
+  labs(
+    title = "Proportion of Ventilation Types by Cooking Fuel",
+    x = "Type of Fuel (varn011)",
+    y = "Proportion",
+    fill = "Ventilation Type (var048)"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+
+
+## title
+
+content
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+
+```
+
