@@ -1,8 +1,11 @@
 ---
 title: "uHoo_viz"
 author: "Gabrielle"
-date: "2025-08-05"
+date: "2025-08-20"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -12,16 +15,115 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(tidyverse)
-
+library(googlesheets4)
 ```
 
 ## Puente Piedra Pollution Data via uHoo Devices
 
-Bar Plot of High and Low Temps by Device: emphasizes differences across devices
+- Number of devices: 4 
+        - Is there no device number 3? (I only see uHoo 1,uHoo 2, uHoo 4, and uHoo 5 
+    - Were they kept in the same location & home, or were they moved? 
+
+- (looking at the “compare” tab with historical data..) 
+    - Start Date: 22 February 2025 
+    - End Date: 24 March 2025
+
+
+AQI Table from U.S. Environmental Protection Agency and National Oceanic and Atmospheric Administration
+[NOAA](https://www.weather.gov/abq/EmergencyPrepAirQuality "Explore the AQI Chart")
+
+
+``` {r, out.width="50%", fig.align='center', echo=FALSE}
+knitr::include_graphics("/Users/gabriellebenoit/Documents/GitHub/peru_air/AQI.png")
+```
+
+##### Purple Air - alternative air quality monitoring option
+PurpleAir is a global initiative that provides accessible and hyper-local air quality monitoring through a network of privately owned sensors widely distributed in neighborhoods, schools, and homes. The sensors use a fan to draw air past a laser, where light scattered by airborne particles is measured—the intensity of this scattered light corresponds to the concentration of particulate matter (PM2.5 and PM10). All data is publicly accessible through PurpleAir's interactive dashboard map, creating a real-time citizen science network that complements official government air quality stations, which tend to be fewer in number and provide less comprehensive geographic coverage.
+
+[PurpleAir](https://map.purpleair.com/air-quality-standards-us-epa-aqi?opt=%2F1%2Flp%2Fa10%2Fp604800%2FcC0#1/25/-30 "Explore the Interactive Map")
+
+#### uHoo, data source for this project
+uHoo is an air monitoring system that analyzes indoor air quality and provides detailed information about pollutants and other factors affecting air quality. It measures nine different parameters (listed below) and connects to both an individual/private web dashboard and to a smartphone app. The user is able to track real-time and historical data, receive notifications about harmful air conditions, and integrate with other 'smart' home devices. 
+
+[uHoo](https://getuhoo.com/ "Explore the uHoo Device")
+
+
+#### Measures:
+
+1.  Temperatures Quick estimate - double the Celsius temperature,
+    subtract 10%, and then add 32.
+2.  Humidity
+3.  Air pressure
+4.  Carbon dioxide
+5.  TVOC (Total Volatile Organic Compounds)
+6.  PM2.5
+7.  Nitrogen Dioxide
+8.  Carbon Monoxide
+9.  Ozone
+
+#### Virus Index:
+Correlational studies linking infectivity to poor air quality
+  - Temperature: Optimum range: 19 °C to 24 °C
+      - Cool, but not too cold
+  - Humidity: Optimum range: 40% to 60%
+      - Low humidity leads to dry nasal passage and increased vulnerability to cold viruses
+      - High humidity is associated with mold growth, which can be harmful to people with less robust immune system
+  - PM2.5: Optimum range: Below 13 μg/m3
+      - Particulate matter that is smaller than 2.5 microns can be inhaled deep into the lungs, cause irritation and corrosion of the alveolar wall, and impair lung function
+        - PM2.5 are known to carry microbes
+      - Use proper ventilation while cooking, too
+  - Carbon Dioxide: Optimum range: Below 800 ppm
+      - High levels indicate poor ventilation, and can result in lung inflammation
+      - Exposure to high levels for long periods of time can cause fatigue, headaches, and dizziness
+  - Nitrogen Dioxide: Optimum range: Below 54 ppb
+      - Short term exposure irritates the airways
+      - Long term exposure can result in chronic respiratory illnesses, particularly for people with asthma
+
+#### Mold Index: 
+  - Temperature: Optimum range: 20 °C to 25 °C
+      - Mold thrives in warm, humid environments; monitor temperature and humidity to reduce risk of mold growth
+  - Humidity: Optimum range: 30% to 50%
+      - Maintaining proper indoor humidity levels can significantly reduce the risk of mold
+      - Control moisture generative activities such as cooking and bathing
+  - Carbon Dioxide: Optimum range: Below 800 ppm
+      - Indicator of poor spatial ventilation
+      - Increased risk of lung inflammation 
+  - PM2.5: Optimum range: Below 15 μg/m3
+      - Not a direct link, but can exacerbate asthma effects of mold exposure
+
+#### Discomfort Index: 
+  - Humidity: Optimum range 40-55%
+      - Bad (Humid): Irritable, higher levels of dust mites, bacteria, and fungi are in the air
+      - Severe Humidity
+          - Clammy, sweaty; prolonged exposure can result in overheating, increased heart rate and respiration, and muscle cramps
+
+#### Google Sheet with Manually Retrieved uHoo Air Quality Data
+
+[uHoo Data for brief investigation](https://docs.google.com/spreadsheets/d/1DDBmP87x2qYeGHrDIL4s2tVYbPjKI0qkHL10f0_asYM/edit?gid=982448321#gid=982448321 "Explore the data")
+
+Comment regarding sheet: data_for_R
+- This data is gathered from looking at the "compare" section of uHoo and setting the monitor to each device (i.e. uHoo (DA82)) and then selecting the indicator (i.e. temperature) and then manually noting the high and the low for both March 1st and March 18th. I don't think the data in the Analytics tab is correct (there are negative humidity readings and super high TVOC readings... could be from the first 24hours after setup of the device that can be inaccurate. There is also no way to export/download the data - I could try reaching out to the company to get an API though, possibly.
+```{r googlesheet, include = FALSE}
+gs4_auth()
+
+google_sheet_url <- "https://docs.google.com/spreadsheets/d/1DDBmP87x2qYeGHrDIL4s2tVYbPjKI0qkHL10f0_asYM/edit?gid=982448321#gid=982448321" # Replace with your sheet URL
+uhoo_data <- read_sheet(google_sheet_url, sheet = "data_for_R")
+
+```
+
+
+
+#### Guide for figures:
+
+Bar Plot of High and Low Temps by Device: emphasizes differences across
+devices
 
 Point Range Plot: visually summarizes the variability per device
 
-Plot with dates included -- only analyzed Saturday, March 1st, 2025 & Tuesday, March 18th, 2025
+Plot with dates included -- only analyzed Saturday, March 1st, 2025 &
+Tuesday, March 18th, 2025
+
+#### Temperature
 
 ```{r temperature, echo=FALSE}
 # Create the temperature dataset
@@ -74,6 +176,8 @@ ggplot(df_long2, aes(x = Day, y = Temperature, color = Type, group = Type)) +
 
 ```
 
+#### Humidity
+
 ```{r humidity, echo=FALSE}
 # Manually entering the humidity data without % symbols
 df <- data.frame(
@@ -122,6 +226,7 @@ ggplot(df_long2, aes(x = Day, y = Humidity, color = Type, group = Type)) +
   theme_minimal()
 ```
 
+#### Carbon Dioxide
 
 ```{r carbon dioxide, echo=FALSE}
 
@@ -173,6 +278,7 @@ ggplot(df_long2, aes(x = Day, y = CO2, color = Type, group = Type)) +
 
 ```
 
+#### Total Volatile Organic Compounds
 
 ```{r TOVC, echo=FALSE}
 
@@ -224,6 +330,7 @@ ggplot(df_long2, aes(x = Day, y = TVOC, color = Type, group = Type)) +
 
 ```
 
+#### Particulate Matter 2.5 micrometers
 
 ```{r PM2.5, echo=FALSE}
 
@@ -277,6 +384,7 @@ ggplot(df_long2, aes(x = Day, y = PM2_5, color = Type, group = Type)) +
 
 ```
 
+#### Nitrogen Dioxide
 
 ```{r nitrogen dioxide, echo=FALSE}
 
@@ -330,6 +438,7 @@ ggplot(df_long2, aes(x = Day, y = NO2, color = Type, group = Type)) +
 
 ```
 
+#### Carbon Monoxide
 
 ```{r carbon monoxide, echo=FALSE}
 
@@ -383,6 +492,7 @@ ggplot(df_long2, aes(x = Day, y = CO, color = Type, group = Type)) +
 
 ```
 
+#### Ozone
 
 ```{r ozone, echo=FALSE}
 
@@ -435,4 +545,3 @@ ggplot(df_long2, aes(x = Day, y = O3, color = Type, group = Type)) +
   theme_minimal()
 
 ```
-

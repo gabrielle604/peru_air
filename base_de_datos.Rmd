@@ -2,23 +2,34 @@
 title: "base_de_datos"
 author: "Gabrielle"
 date: "2025-08-12"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
+
+This file loads the two files from Eder
+- "Base de datos Uhoo.xlsx"
+- "Base de datos (Monica).xlsx"
+
+Then, merges them together via "número de conglomerado o pin"
+
+Next, the data is preliminarily cleaned, explored, and visualized.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-# install.packages("readxl")   # Run this once
 library(readxl)
 library(ggplot2)
 library(dplyr)
 library(stringr)
 library(tidyr)
 library(tidyverse)
+library(janitor)
 ```
 
+## Load: (1) base uHoo data and the (2) base clinical data
 
-```{r load-data}
+```{r load-data, warning=FALSE}
 # Load the first sheet
 base_monica <- read_excel("Base_de_datos_Monica.xlsx")
 
@@ -40,11 +51,12 @@ merged_data <- base_uHoo %>%
 
 ```
 
-## Exploring the data
+## Explore the data
 ```{r}
-merged_data %>% 
-  select(Sector, `Conglomerado o # de pin`) %>% 
-  head(10)
+merged_data %>%
+  select(Sector, `Conglomerado o # de pin`) %>%
+  head(10) %>%
+  knitr::kable(caption = "Sample of merged data by sector")
 
 
 merged_data %>%
@@ -67,16 +79,88 @@ merged_data %>%
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-```
-
-
-
-## title
-
-content
-
-```{r pressure, echo=FALSE}
-plot(pressure)
 
 ```
 
+## Clean up the data
+
+Also, re-arrange the data for uHoo monitors to be long rather than wide.
+
+```{r, echo = FALSE}
+## clean up the data names
+merged_data <- merged_data %>% clean_names()
+
+merged_data_long <- merged_data %>%
+  pivot_longer(
+    cols = starts_with("u_hoo"),       # grabs columns "uHoo 1" ... "uHoo 5"
+    names_to = "uhoo_device_col",     # temporary column name for the wide col names
+    values_to = "uhoo_device",        # the non-NA entry (e.g., "uHoo 3")
+    values_drop_na = TRUE             # keeps only the rows with non-NA values
+  ) %>%
+  select(-uhoo_device_col)            # drop the temporary column if you don’t need it
+
+merged_data_long %>%
+  filter(!is.na(varn011), !is.na(uhoo_device)) %>%  # remove missing
+  group_by(varn011, uhoo_device) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(varn011) %>%
+  mutate(prop = count / sum(count)) %>%
+  ggplot(aes(x = varn011, y = prop, fill = uhoo_device)) +
+  geom_col(position = "fill") +
+  labs(
+    title = "uHoo device by Cooking Fuel",
+    x = "Type of Fuel (varn011)",
+    y = "Proportion",
+    fill = "uHoo_device"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+## count the non uHoo variables before and after
+lost_vars <- setdiff(names(merged_data), names(merged_data_long))
+added_vars <- setdiff(names(merged_data_long), names(merged_data))
+
+# Combine into one comparison table
+max_length <- max(length(lost_vars), length(added_vars))
+
+comparison_df <- tibble(
+  `Variables Lost` = c(lost_vars, rep(NA, max_length - length(lost_vars))),
+  `Variables Added` = c(added_vars, rep(NA, max_length - length(added_vars)))
+)
+
+comparison_df %>%
+  knitr::kable(caption = "Complete comparison: Variables lost and gained during transformation",
+               na = "")
+
+
+
+# Create a nice side-by-side comparison
+before <- merged_data %>% 
+  select(conglomerado_o_number_de_pin, submission_date) %>% 
+  head() %>%
+  mutate(Dataset = "Original (Wide)")
+
+after <- merged_data_long %>% 
+  select(conglomerado_o_number_de_pin, submission_date) %>% 
+  head() %>%
+  mutate(Dataset = "Transformed (Long)")
+
+bind_rows(before, after) %>%
+  knitr::kable(caption = "Comparison: Before and after wide-to-long transformation",
+               col.names = c("Conglomerate/PIN", "Submission Date", "Dataset"))
+
+
+
+device_summary <- merged_data %>%
+  select(u_hoo_1, u_hoo_2, u_hoo_3, u_hoo_4, u_hoo_5) %>%
+  pivot_longer(everything(), names_to = "Device", values_to = "Status") %>%
+  count(Device, Status) %>%
+  pivot_wider(names_from = Status, values_from = n, values_fill = 0)
+
+device_summary %>%
+  knitr::kable(caption = "Status distribution across uHoo devices")
+
+```
