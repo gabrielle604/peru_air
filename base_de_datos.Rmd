@@ -164,3 +164,81 @@ device_summary %>%
   knitr::kable(caption = "Status distribution across uHoo devices")
 
 ```
+
+Looking at Cognitive Impairment and uHoo device
+```{r}
+# using column kl, which I assume is a cognitive impairment indicator
+
+merged_data_long %>%
+  filter(!is.na(kl), !is.na(uhoo_device)) %>%  # remove missing
+  group_by(kl, uhoo_device) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(kl) %>%
+  mutate(prop = count / sum(count)) %>%
+  ggplot(aes(x = kl, y = prop, fill = uhoo_device)) +
+  geom_col(position = "fill") +
+  labs(
+    title = "Cognitive Impairment by uHoo Device",
+    x = "Cognitive Impairment Indicator",
+    y = "Proportion",
+    fill = "uHoo_device"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+
+
+```{r}
+# using column km, which I assume is something related to a pollutant
+merged_data_long %>%
+  filter(!is.na(uhoo_device), !is.na(km)) %>%  # remove missing
+  group_by(uhoo_device, km) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(uhoo_device) %>%
+  mutate(prop = count / sum(count)) %>%
+  ggplot(aes(x = uhoo_device, y = prop, fill = km)) +
+  geom_col(position = "fill") +
+  labs(
+    title = "Polluting Indicator by uHoo Device",
+    x = "uHoo Device",
+    y = "Proportion",
+    fill = "Polluting Indicator"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+
+
+```{r}
+# var 054 -- education level?
+merged_data_long %>%
+  filter(!is.na(kl), !is.na(uhoo_device), !is.na(var054)) %>%  # remove missing
+  group_by(var054, uhoo_device, kl) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(var054, uhoo_device) %>%
+  mutate(prop = count / sum(count)) %>%
+  filter(kl == "Con deterioro cognitivo") %>%  # Show only cognitive impairment proportion
+  ggplot(aes(x = var054, y = prop, fill = uhoo_device)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Cognitive Impairment Rate by Education Level and Air Quality Monitor",
+    subtitle = "Proportion of people with cognitive impairment in each group",
+    x = "Education Level",
+    y = "Proportion with Cognitive Impairment",
+    fill = "Air Quality Monitor\n(uHoo Device)"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
