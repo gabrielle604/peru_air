@@ -16,6 +16,10 @@ library(dplyr)
 library(tidyr)
 library(tidyverse)
 library(googlesheets4)
+library(broom)
+library(ggplot2)
+library(gridExtra)
+library(patchwork)
 ```
 
 ## Puente Piedra Pollution Data via uHoo Devices
@@ -562,6 +566,17 @@ ggplot(df_summary, aes(x = Device)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggplot(df_summary, aes(x = Device, color = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2),
+                  size = 1.2, fatten = 4) +
+  scale_color_manual(values = c("#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4")) +
+  labs(title = "Ozone Range by Device",
+       x = "Device", y = "O3 (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.margin = margin(b = 20, unit = "pt"),
+        legend.position = "none")  # Hide legend since x-axis shows device names
+
 # Reshape with Day preserved
 df_long2 <- df %>%
   pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "O3")
@@ -576,3 +591,128 @@ ggplot(df_long2, aes(x = Day, y = O3, color = Type, group = Type)) +
   theme_minimal()
 
 ```
+
+
+
+Make combined plot for three pollution measures and only devices 1 and 4:
+```{r}
+# Add vibrant colors to the original three-panel figure
+# NOTE: Need separate df_summary dataframes for each pollutant
+
+
+## TVOC
+# Manually entering and cleaning the data
+df_tvoc <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(1896, 2812, 208, 1986, 980, 10330, 870, 2792),
+  Low  = c(183, 1100, 2, 7, 0, 374, 2, 11)
+)
+
+# Average across dates per device
+df_tvoc_summary <- df_tvoc %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_tvoc_long <- df_tvoc_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "TVOC")
+
+
+
+## PM2.5
+# Manually entering and cleaning the data
+df_pm <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(13, 12, 11, 8, 18, 30, 12, 13),
+  Low  = c(4, 4, 6, 2, 10, 11, 7, 6)
+)
+
+# Average across dates per device
+df_pm_summary <- df_pm %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_pm_long <- df_pm_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "PM2_5")
+
+
+## OZONE
+# Manually entering and cleaning the data
+df_ozone <- data.frame(
+  Device = c("uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)",
+             "uHoo 1 (DA82)", "uHoo 2 (EEDC)", "uHoo 4 (59E1)", "uHoo 5 (60B6)"),
+  Day = as.Date(c("2025-03-01", "2025-03-01", "2025-03-01", "2025-03-01",
+                  "2025-03-18", "2025-03-18", "2025-03-18", "2025-03-18")),
+  High = c(7, 11, 8, 5, 8, 10, 8, 9),
+  Low  = c(3, 7, 6, 4, 6, 7, 5, 4)
+)
+
+# Average across dates per device
+df_ozone_summary <- df_ozone %>%
+  group_by(Device) %>%
+  summarise(High = mean(High), Low = mean(Low))
+
+# Reshape to long format
+df_ozone_long <- df_ozone_summary %>%
+  pivot_longer(cols = c(High, Low), names_to = "Type", values_to = "O3")
+
+
+
+
+# TVOC Plot (values range ~0-6500 ppb - HUGE range!)
+p1 <- ggplot(df_tvoc_summary, aes(x = Device, color = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2),
+                  size = 1.2, fatten = 4) +
+  scale_color_manual(values = c("#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4")) +
+  scale_y_continuous(limits = c(0, 7000), breaks = seq(0, 7000, 1000)) +
+  labs(title = "TVOC Range by Device",
+       x = "Device", y = "TVOC (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        plot.margin = margin(t = 30, r = 20, b = 30, l = 20, unit = "pt"),
+        legend.position = "none")
+
+# PM2.5 Plot (values range ~2-21 µg/m³ - much smaller range)
+p2 <- ggplot(df_pm_summary, aes(x = Device, color = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2),
+                  size = 1.2, fatten = 4) +
+  scale_color_manual(values = c("#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4")) +
+  scale_y_continuous(limits = c(0, 25), breaks = seq(0, 25, 5)) +
+  labs(title = "PM2.5 Range by Device",
+       x = "Device", y = "PM2.5 (µg/m³)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        plot.margin = margin(t = 30, r = 20, b = 30, l = 20, unit = "pt"),
+        legend.position = "none")
+
+# Ozone Plot (values range ~4-9 ppb - smallest range)
+p3 <- ggplot(df_ozone_summary, aes(x = Device, color = Device)) +
+  geom_pointrange(aes(ymin = Low, ymax = High, y = (Low + High)/2),
+                  size = 1.2, fatten = 4) +
+  scale_color_manual(values = c("#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4")) +
+  scale_y_continuous(limits = c(0, 12), breaks = seq(0, 12, 2)) +
+  labs(title = "Ozone Range by Device",
+       x = "Device", y = "O3 (ppb)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        plot.margin = margin(t = 30, r = 20, b = 30, l = 20, unit = "pt"),
+        legend.position = "none")
+
+# Combine into one figure
+grid.arrange(p1, p2, p3, ncol = 3)
+
+
+
+
+
+
+
+```
+

@@ -230,7 +230,7 @@ merged_data_long %>%
   geom_col(position = "dodge") +
   labs(
     title = "Cognitive Impairment Rate by Education Level and Air Quality Monitor",
-    subtitle = "Proportion of people with cognitive impairment in each group",
+    subtitle = "Proportion of people with cognitive impairment in each education group",
     x = "Education Level",
     y = "Proportion with Cognitive Impairment",
     fill = "Air Quality Monitor\n(uHoo Device)"
