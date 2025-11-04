@@ -1,0 +1,40 @@
+---
+title: "uHoo_historical"
+author: "Gabrielle"
+date: "2025-10-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Puente Piedra Air Pollution Data
+
+uHoo: Device 1 and Device 4
+
+We have created a new Partner account for uHoo and linked it to the premium account. This allows for access to the API and data downloads.
+Resource for using the uHoo API: https://documenter.getpostman.com/view/180333/TVzNJesN
+
+From Eder: The environmental evaluations from Puente Piedra were done between June and October 2022.
+
+From the merged data, I see "fecha": April, 2022 to May 2023
+
+
+
+
+
+
+```{r cars}
+summary(cars)
+```
+
+## Vizualizations
+
+Describe the plots, figures, etc. 
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
