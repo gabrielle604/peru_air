@@ -37,6 +37,7 @@ base_uHoo <- read_excel("Base_de_datos_UHOO.xlsx")
 
 ```
 
+
 ## Merge the two files by numero de conglomerado o pin
 ```{r}
 merged_data <- base_uHoo %>%
@@ -50,6 +51,21 @@ merged_data <- base_uHoo %>%
   )
 
 ```
+
+
+## Check how many observations for uHoo 1 and uHoo 4
+```{r}
+sum(!is.na(merged_data$`uHoo 1`)) 
+## 17
+sum(!is.na(merged_data$`uHoo 4`))
+## 43
+
+summary(merged_data$`uHoo 1`)
+summary(merged_data$`uHoo 4`)
+
+```
+
+
 
 ## Explore the data
 ```{r}
