@@ -48,8 +48,8 @@ device_list_response <- GET(
 device_list <- content(device_list_response, "parsed")
 
 # Date range for data collection
-start_date <- "2022-05-01"
-end_date <- "2022-05-30"
+start_date <- "2022-06-01"
+end_date <- "2022-06-30"
 dates_to_process <- generate_dates(start_date, end_date)
 
 all_data <- list()
