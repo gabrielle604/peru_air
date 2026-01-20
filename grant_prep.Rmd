@@ -1,0 +1,407 @@
+---
+title: "grant_prep"
+author: "Gabrielle"
+date: "2026-01-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(tidyverse)
+library(janitor)
+```
+
+## Pare back the data
+
+Variables of interest, focusing on core demographic, socioeconomic, health, anthropometric, chronic disease, and cognitive measures
+
+ Monica: For the dataset attached, the following variables are the ones that are important:
+(1) demencia_aj_alt = dementia only in younger adults (who took the ACE)
+(2) demencia_am = dementia in older adult (DC = deterioro cognitivo, DCL = deterioro cognitivo level)
+(3) ace_cal = ACE total score
+
+Eder [Translated with DeepL.com]: 
+1. In young adults, we apply a cutoff point of 70 to distinguish CD from non-CD.
+
+2. In older adults, we apply cutoff points of 19 and 23 to distinguish non-CD, MCI, and dementia. 
+
+3. In both cases, we do not use the functional assessment variable. We do apply it in the “dementia” variable, which identifies “severe DC without functional impairment” when PFAQ was <=5 and “severe DC with functional impairment” when PFAQ was >=6 points. In the case of older adults, the DC category included only dementia.
+
+PFAQ = Pfeffer Activities of Daily Living questionnaire
+
+```{r foundation}
+vars_keep <- c(
+  "var008","var009","var019","var042","var043","var044","var049","var050",
+  "var052","var053","var054","var055","var056","varn031","var069_n","var070_n",
+  "varn041","var079_a","var062","var063","var064","varn065","varn073","varn151",
+  "observacio_detalle","var999","varn012_n","varn013_n","varn014_n","varn015_n",
+  "varn017_n","varn018_n","varn019_n","varn020_n","varn021_n","varn022_n",
+  "varn100_n","etnia","lengua_mat","nse_cat_inv","nse_n_cat_inv","varn111_n",
+  "var051_cat","region","var053_cat","var054_cat_cor","var059_cat","var061_cat",
+  "hta","imc","estado_nutricional","sobobe","dm","velocidad_marcha",
+  "var078_cat","var079_a_01","var079_a_02","var079_a_03","var079_a_04",
+  "var079_a_05","var079_a_06","var079_a_07","var079_a_08",
+  "rudas_cal","pfaq","demencia_aj", "demencia_aj_alt","dco_dem","demencia", "dementia_am", "ace_cal","depresion_dic"
+)
+
+base_monica_reduced <- base_monica %>%
+  select(any_of(vars_keep))
+
+```
+
+
+## Rename cleanly 
+```{r}
+base_monica_renamed <- base_monica_reduced %>%
+  rename(
+    ## Geography / IDs
+    district                = any_of("var008"),
+    sector                  = any_of("var009"),
+    national_id             = any_of("var019"),
+    region                  = any_of("region"),
+
+    ## Household fuel
+    fuel_type               = any_of("var042"),
+    fuel_use_frequency      = any_of("var043"),
+    fuel_use_years          = any_of("var044"),
+
+    ## Demographics
+    age                     = any_of("var049"),
+    years_residence         = any_of("var050"),
+    region_of_origin        = any_of("var052"),
+    maternal_language       = any_of("var053"),
+    education_level         = any_of("var054"),
+    years_education         = any_of("var055"),
+    marital_status          = any_of("var056"),
+    sex                     = any_of("var051_cat"),
+    ethnicity               = any_of("etnia"),
+    language                = any_of("lengua_mat"),
+
+    ## Socioeconomic status
+    employment_paid         = any_of("varn031"),
+    ses_category            = any_of("nse_cat_inv"),
+    ses_quintile            = any_of("nse_n_cat_inv"),
+    insufficient_food_income= any_of("varn100_n"),
+
+    ## Housing & services
+    electricity_service     = any_of("varn012_n"),
+    piped_water             = any_of("varn013_n"),
+    sewer_service           = any_of("varn014_n"),
+    internet_service        = any_of("varn015_n"),
+    computer_access         = any_of("varn017_n"),
+    washing_machine         = any_of("varn018_n"),
+    oven                    = any_of("varn019_n"),
+    refrigerator            = any_of("varn020_n"),
+    vehicle_ownership       = any_of("varn021_n"),
+    domestic_service        = any_of("varn022_n"),
+
+    ## Health access
+    no_healthcare_access    = any_of("varn111_n"),
+    health_insurance        = any_of("var061_cat"),
+
+    ## Anthropometrics
+    weight_kg               = any_of("var069_n"),
+    height_m                = any_of("var070_n"),
+    bmi                     = any_of("imc"),
+    nutritional_status      = any_of("estado_nutricional"),
+    overweight_obese        = any_of("sobobe"),
+
+    ## Clinical measures
+    blood_glucose           = any_of("varn041"),
+    hypertension            = any_of("hta"),
+    diabetes                = any_of("dm"),
+    gait_speed_ms           = any_of("velocidad_marcha"),
+
+    ## Health behaviors
+    smoking                 = any_of("var064"),
+    alcohol_use             = any_of("varn065"),
+
+    ## Chronic conditions
+    chronic_disease         = any_of("var078_cat"),
+    reported_conditions     = any_of("var079_a"),
+
+    ## Specific conditions
+    diabetes_mellitus       = any_of("var079_a_01"),
+    arterial_hypertension   = any_of("var079_a_02"),
+    obesity_hyperalimentation = any_of("var079_a_03"),
+    gastritis_duodenitis    = any_of("var079_a_04"),
+    low_back_pain           = any_of("var079_a_05"),
+    osteoarthritis          = any_of("var079_a_06"),
+    prostate_hyperplasia    = any_of("var079_a_07"),
+    cataract                = any_of("var079_a_08"),
+
+    ## Cognitive & mental health
+    confusion_memory_loss   = any_of("varn151"),
+    rudas_score             = any_of("rudas_cal"),
+    pfaq_score              = any_of("pfaq"),
+    dementia_aj             = any_of("demencia_aj"),
+    dementia_young          = any_of("demencia_aj_alt"),
+    severe_objective_ci     = any_of("dco_dem"),
+    dementia                = any_of("demencia"),
+    dementia_older          = any_of("demencia_am"),
+    ace_total_score         = any_of("ace_cal"),
+    depression              = any_of("depresion_dic"),
+    cognitive_eval_incomplete = any_of("var999"),
+
+    ## Location / notes
+    location_description    = any_of("varn073"),
+    observation_detail      = any_of("observacio_detalle")
+  )
+
+write.csv(base_monica_renamed, "cleaned_data.csv", row.names = FALSE)
+
+```
+
+
+## Read in 11 Purple Air Sensor Data, one by one
+
+```{r}
+pa1 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/LV_129323 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+
+pa2 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/MP_PP_West_159005 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa3 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/V_West_159435 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa4 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/L_159465 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa5 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/C_WestSouth_159599 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa6 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/Carab_PP_East_180021 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa7 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/SMDP_PP_South_180043 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa8 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/JM_180073 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa9 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/PP_Central_180119 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa10 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/B_180251 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+pa11 <- read_csv(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/Comas_PP_East_180321 2022-01-01 2026-01-10 43200-Minute Average.csv",
+  show_col_types = FALSE
+) %>%
+  clean_names()
+
+
+
+glimpse(pa1$time_stamp)
+
+```
+
+
+
+# Combine pa1–pa11 into one tidy object
+```{r}
+# explicitly add sensor id
+pa1 <- pa1 %>% mutate(sensor_id = "pa1")
+pa2 <- pa2 %>% mutate(sensor_id = "pa2")
+pa3 <- pa3 %>% mutate(sensor_id = "pa3")
+pa4 <- pa4 %>% mutate(sensor_id = "pa4")
+pa5 <- pa5 %>% mutate(sensor_id = "pa5")
+pa6 <- pa6 %>% mutate(sensor_id = "pa6")
+pa7 <- pa7 %>% mutate(sensor_id = "pa7")
+pa8 <- pa8 %>% mutate(sensor_id = "pa8")
+pa9 <- pa9 %>% mutate(sensor_id = "pa9")
+pa10 <- pa10 %>% mutate(sensor_id = "pa10")
+pa11 <- pa11 %>% mutate(sensor_id = "pa11")
+
+
+pa_all <- bind_rows(
+  pa1, pa2, pa3, pa4, pa5, pa6, pa7, pa8, pa9, pa10, pa11
+)
+
+```
+
+
+# Summary by sensor
+
+ab_summary table:
+- internal consistency
+- sensor reliability
+- whether any sensor is systematically noisy
+
+```{r}
+pa_all <- pa_all %>%
+  mutate(
+    ab_diff = pm2_5_cf_1_a - pm2_5_cf_1_b,
+    ab_abs_diff = abs(ab_diff)
+  )
+
+ab_summary <- pa_all %>%
+  group_by(sensor_id) %>%
+  summarise(
+    mean_abs_diff = mean(ab_abs_diff, na.rm = TRUE),
+    median_abs_diff = median(ab_abs_diff, na.rm = TRUE),
+    pct_large_diff = mean(ab_abs_diff > 5, na.rm = TRUE) * 100,
+    n = n(),
+    .groups = "drop"
+  )
+
+```
+
+# Investigate 
+
+Stratify A–B agreement by month (to detect firmware periods)
+```{r}
+# Create monthly agreement summary
+ab_monthly <- pa_all %>%
+  mutate(
+    time_stamp = as.Date(time_stamp),
+    year_month = floor_date(time_stamp, "month")
+  ) %>%
+  group_by(sensor_id, year_month) %>%
+  summarise(
+    n_obs = n(),
+    mean_diff = mean(ab_diff, na.rm = TRUE),
+    sd_diff = sd(ab_diff, na.rm = TRUE),
+    mean_abs_diff = mean(ab_abs_diff, na.rm = TRUE),
+    median_abs_diff = median(ab_abs_diff, na.rm = TRUE),
+    pct_large_diff = mean(ab_abs_diff > 5, na.rm = TRUE) * 100,
+    # Correlation between channels A and B
+    cor_ab = cor(pm2_5_cf_1_a, pm2_5_cf_1_b, use = "complete.obs"),
+    # IQR of absolute differences (robustness check)
+    iqr_abs_diff = IQR(ab_abs_diff, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# View the monthly summary
+print(ab_monthly)
+
+# Identify potential firmware change points
+# Look for months with notable shifts in agreement metrics
+ab_monthly <- ab_monthly %>%
+  group_by(sensor_id) %>%
+  arrange(year_month) %>%
+  mutate(
+    # Change from previous month
+    delta_mean_abs = mean_abs_diff - lag(mean_abs_diff),
+    delta_cor = cor_ab - lag(cor_ab),
+    # Flag large changes (adjust thresholds as needed)
+    flag_agreement_shift = abs(delta_mean_abs) > 1.0 | abs(delta_cor) > 0.1
+  ) %>%
+  ungroup()
+
+# Summary: overall monthly pattern (across all sensors)
+ab_monthly_overall <- ab_monthly %>%
+  group_by(year_month) %>%
+  summarise(
+    n_sensors = n(),
+    avg_mean_abs_diff = mean(mean_abs_diff, na.rm = TRUE),
+    avg_cor_ab = mean(cor_ab, na.rm = TRUE),
+    n_flagged = sum(flag_agreement_shift, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+print(ab_monthly_overall)
+
+# Visualization: time series of agreement by month
+ggplot(ab_monthly, aes(x = year_month, y = mean_abs_diff, color = sensor_id)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "A-B Channel Agreement Over Time",
+    subtitle = "Mean absolute difference by sensor and month",
+    x = "Month",
+    y = "Mean |A - B|",
+    color = "Sensor"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Correlation over time
+ggplot(ab_monthly, aes(x = year_month, y = cor_ab, color = sensor_id)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0.95, linetype = "dashed", color = "red") +
+  labs(
+    title = "A-B Channel Correlation Over Time",
+    subtitle = "Pearson correlation by sensor and month",
+    x = "Month",
+    y = "Correlation (A, B)",
+    color = "Sensor"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Heatmap: mean absolute difference by sensor × month
+ggplot(ab_monthly, aes(x = year_month, y = sensor_id, fill = mean_abs_diff)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  labs(
+    title = "A-B Agreement Heatmap",
+    x = "Month",
+    y = "Sensor",
+    fill = "Mean |A - B|"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+
+## Plots
+
+Embed descriptive plots
+
+```{r demographics, echo=FALSE}
+pa_all %>%
+  mutate(ab_abs_diff = abs(pm2_5_cf_1_a - pm2_5_cf_1_b)) %>%
+  ggplot(aes(x = ab_abs_diff)) +
+  geom_histogram(binwidth = 0.5) +
+  facet_wrap(~ sensor_id, scales = "free_y") +
+  labs(
+    title = "Absolute Difference Between PM2.5 A and B Channels",
+    x = "|A − B| (µg/m³)",
+    y = "Count"
+  )
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

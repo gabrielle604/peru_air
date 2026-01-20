@@ -1,0 +1,56 @@
+Progress Logs
+-------------
+Sensors With Data in Time Range: 2
+Sensors Without Data in Time Range: 0
+
+Sensors Not Found: 0
+Invalid Sensor Indexes: 0
+Sensor Indexes Encountering Other Errors: 0
+Sensor Indexes Not Processed: 0
+
+Start Timestamp: 2024-01-01T00:00:00Z
+End Timestamp: 2025-01-02T00:00:00Z
+Average: 525600
+Fields: pm2.5_atm,pm10.0_atm
+Total Data Rows Downloaded: 2
+
+Number of Sensors: 2
+Number of Read Keys: 0
+
+Download Started at: 2026-01-10T20:36:05-08:00
+Download Ended   at: 2026-01-10T20:36:10-08:00
+Download Took: 5 seconds
+
+-------------
+Sensor Indexes Not Found:
+
+
+Invalid Sensor Indexes:
+
+
+Sensors Without Any Data For Specified Time Period:
+
+
+Sensors Where No Download Was Attempted Yet Due to Process Being Aborted:
+
+
+Aborted on Sensors:
+
+
+Sensors With Number of Downloaded Data Rows:
+129323 : 1 data rows
+180073 : 1 data rows
+  
+
+-------------
+Starting requests for sensor 180073.
+Making request 1 from 2024-01-01 to 2025-01-02
+Data download completed for sensor 180073. Downloaded 1 rows of data.
+
+Starting requests for sensor 129323.
+Making request 2 from 2024-01-01 to 2025-01-02
+Data download completed for sensor 129323. Downloaded 1 rows of data.
+
+
+Download request has been completed. Scroll down for a summary:
+--------------------------------------

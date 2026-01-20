@@ -53,6 +53,49 @@ merged_data <- base_uHoo %>%
 ```
 
 
+Count overlapping key pairs
+```{r}
+base_uHoo %>%
+  distinct(`Conglomerado o # de pin`, Sector) %>%
+  inner_join(
+    base_monica %>% distinct(var010, var009),
+    by = c(
+      "Conglomerado o # de pin" = "var010",
+      "Sector" = "var009"
+    )
+  ) %>%
+  nrow()
+
+```
+
+
+See which uHoo rows matched Monica
+```{r}
+base_uHoo %>%
+  semi_join(
+    base_monica,
+    by = c(
+      "Conglomerado o # de pin" = "var010",
+      "Sector" = "var009"
+    )
+  )
+```
+
+See which uHoo rows did not match Monica
+```{r}
+base_uHoo %>%
+  anti_join(
+    base_monica,
+    by = c(
+      "Conglomerado o # de pin" = "var010",
+      "Sector" = "var009"
+    )
+  )
+
+```
+
+The reduced row count after the full_join() is expected, not data loss. Although there are 64 distinct (PIN, Sector) combinations shared between the two datasets, matched rows are merged into single rows, which lowers the total count. Because some of these shared keys appear multiple times in one or both datasets (a many-to-many structure), only 62 rows are effectively “collapsed” in the join. This explains why 71 + 1099 results in 1108 rows in the merged dataset.
+
 ## Check how many observations for uHoo 1 and uHoo 4
 ```{r}
 sum(!is.na(merged_data$`uHoo 1`)) 

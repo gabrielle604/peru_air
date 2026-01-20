@@ -1,0 +1,69 @@
+Progress Logs
+-------------
+Sensors With Data in Time Range: 0
+Sensors Without Data in Time Range: 3
+
+Sensors Not Found: 1
+Invalid Sensor Indexes: 0
+Sensor Indexes Encountering Other Errors: 0
+Sensor Indexes Not Processed: 0
+
+Start Timestamp: 2022-01-01T00:00:00Z
+End Timestamp: 2023-01-02T00:00:00Z
+Average: 525600
+Fields: pm2.5_atm,pm10.0_atm
+Total Data Rows Downloaded: 0
+
+Number of Sensors: 4
+Number of Read Keys: 0
+
+Download Started at: 2026-01-10T20:32:32-08:00
+Download Ended   at: 2026-01-10T20:32:38-08:00
+Download Took: 6 seconds
+
+-------------
+Sensor Indexes Not Found:
+180110
+
+Invalid Sensor Indexes:
+
+
+Sensors Without Any Data For Specified Time Period:
+159005
+180021
+180043
+
+Sensors Where No Download Was Attempted Yet Due to Process Being Aborted:
+
+
+Aborted on Sensors:
+
+
+Sensors With Number of Downloaded Data Rows:
+
+  
+
+-------------
+Starting requests for sensor 180110.
+Making request 1 from 2022-01-01 to 2023-01-02
+Error Code: 404
+Error: NotFoundError
+Description: Cannot find a sensor with the provided parameters.
+Error Meaning: This error means that either the sensor index or sensor read key for this device is incorrect. Double-check them and try the request for this sensor again.
+Due to this error, sensor 180110 is being skipped...
+
+Starting requests for sensor 159005.
+Making request 2 from 2022-01-01 to 2023-01-02
+No data was found for sensor 159005 between 2022-01-01T00:00:00Z and 2023-01-02T00:00:00Z.
+
+Starting requests for sensor 180043.
+Making request 3 from 2022-01-01 to 2023-01-02
+No data was found for sensor 180043 between 2022-01-01T00:00:00Z and 2023-01-02T00:00:00Z.
+
+Starting requests for sensor 180021.
+Making request 4 from 2022-01-01 to 2023-01-02
+No data was found for sensor 180021 between 2022-01-01T00:00:00Z and 2023-01-02T00:00:00Z.
+
+
+Download request has been completed. Scroll down for a summary:
+--------------------------------------
