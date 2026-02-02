@@ -15,6 +15,9 @@ library(stringr)
 library(tidyr)
 library(tidyverse)
 library(janitor)
+library(knitr)
+library(kableExtra)
+library(viridis)  # colorblind-friendly colors
 ```
 
 ## Pare back the data
@@ -404,4 +407,124 @@ pa_all %>%
   )
 ```
 
+# Quality control of PM2.5 measurements.
+To assess internal consistency of PurpleAir PM2.5 measurements, we evaluated agreement between the dual A and B sensing channels. For each observation, we calculated the absolute difference between channels (|A − B|). Observations with |A − B| > 10 µg/m³ were flagged as exhibiting poor channel agreement, consistent with established PurpleAir quality assurance practices. These flagged observations were excluded from primary analyses, and sensitivity analyses were conducted to evaluate robustness to alternative inclusion criteria.
+
+```{r}
+pa_all <- pa_all %>%
+  mutate(
+    ab_abs_diff = abs(pm2_5_cf_1_a - pm2_5_cf_1_b),
+    ab_qc_flag = ab_abs_diff > 10
+  )
+
+
+pa_all %>%
+  group_by(sensor_id) %>%
+  summarize(
+    n_obs = n(),
+    n_flagged = sum(ab_qc_flag, na.rm = TRUE),
+    pct_flagged = mean(ab_qc_flag, na.rm = TRUE) * 100,
+    max_ab_diff = max(ab_abs_diff, na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_flagged))
+
+
+```
+
+
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+# Quick Summary of pm2.5 across all sensors
+```{r}
+pm_summary <- pa_all %>%
+  group_by(sensor_id) %>%
+  summarise(
+    min = min(pm2_5_cf_1, na.rm = TRUE),
+    q25 = quantile(pm2_5_cf_1, 0.25, na.rm = TRUE),
+    median = median(pm2_5_cf_1, na.rm = TRUE),
+    mean = mean(pm2_5_cf_1, na.rm = TRUE),
+    q75 = quantile(pm2_5_cf_1, 0.75, na.rm = TRUE),
+    max = max(pm2_5_cf_1, na.rm = TRUE),
+    n = n()
+  )
+
+print(pm_summary)
+
+kable(pm_summary, digits = 1, 
+      caption = "PM2.5 Summary Statistics by Sensor") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = FALSE) %>%
+  row_spec(0, bold = TRUE, color = "black", background = "white") %>%
+  row_spec(1:nrow(pm_summary), color = "black", background = "white")
+
+# Quick visual comparison
+ggplot(pa_all, aes(x = sensor_id, y = pm2_5_cf_1)) +
+  geom_boxplot() +
+  labs(title = "PM2.5 Distribution by Sensor",
+       x = "Sensor", y = "PM2.5 (μg/m³)") +
+  theme_minimal()
+```
+
+## Simple visualization 
+```{r}
+# Simple PM2.5 Boxplots for Lima, Peru Purple Air Sensors
+# Two approaches: (1) raw data, (2) outliers capped at 150 μg/m³
+
+# Rename sensors with Purple Air codes and district suffix
+pa_all <- pa_all %>%
+  mutate(sensor_id = case_when(
+    sensor_id == "pa1" ~ "129323_JM",
+    sensor_id == "pa2" ~ "159005_PP",
+    sensor_id == "pa3" ~ "159435_PP",
+    sensor_id == "pa4" ~ "159465_JM",
+    sensor_id == "pa5" ~ "159599_PP",
+    sensor_id == "pa6" ~ "180021_PP",
+    sensor_id == "pa7" ~ "180043_PP",
+    sensor_id == "pa8" ~ "180073_JM",
+    sensor_id == "pa9" ~ "180119_PP",
+    sensor_id == "pa10" ~ "180251_JM",
+    sensor_id == "pa11" ~ "180321_PP",
+    TRUE ~ sensor_id
+  ))
+
+# PLOT 1: Raw data (as-is)
+p1 <- ggplot(pa_all, aes(x = sensor_id, y = pm2_5_cf_1)) +
+  geom_boxplot(fill = "#440154FF", alpha = 0.7) +
+  labs(title = "PM2.5 Distribution by Sensor - Raw Data",
+       subtitle = "Lima, Peru (Puente Piedra and Jesus Maria regions)",
+       x = "Sensor ID",
+       y = "PM2.5 (μg/m³)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+print(p1)
+
+
+# PLOT 2: Outliers capped at 150 μg/m³
+# Note: Sensors pa5, pa6, and pa8 have extreme values (>1000 μg/m³) capped for visualization
+pa_capped <- pa_all %>%
+  mutate(pm2_5_capped = ifelse(pm2_5_cf_1 > 150, 150, pm2_5_cf_1))
+
+p2 <- ggplot(pa_capped, aes(x = sensor_id, y = pm2_5_capped)) +
+  geom_boxplot(fill = "#35B779FF", alpha = 0.7) +
+  labs(title = "PM2.5 Distribution by Sensor - Outliers Capped at 150 μg/m³",
+       subtitle = "Lima, Peru (Puente Piedra and Jesus Maria regions)\nNote: Extreme values from 159599_PP, 180021_PP, 180073_JM capped for better visualization",
+       x = "Sensor ID",
+       y = "PM2.5 (μg/m³)",
+       caption = "Sensors 159599_PP (max=2444.7), 180021_PP (max=1050.9), 180073_JM (max=1917.0) have values capped at 150") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+print(p2)
+
+
+# Save both plots
+ggsave("pm25_raw.png", p1, width = 10, height = 6, dpi = 300, bg = "white")
+ggsave("pm25_capped.png", p2, width = 10, height = 6, dpi = 300, bg = "white")
+
+cat("Done! Two plots created:\n")
+cat("1. pm25_raw.png - Shows all data as-is\n")
+cat("2. pm25_capped.png - Outliers >150 capped for better visualization\n")
+```
+
