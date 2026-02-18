@@ -164,6 +164,8 @@ write.csv(base_monica_renamed, "cleaned_data.csv", row.names = FALSE)
 
 ## Read in 11 Purple Air Sensor Data, one by one
 
+# API: 7E14E44F-ECCB-11F0-B596-4201AC1DC123
+
 ```{r}
 pa1 <- read_csv(
   "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/LV_129323 2022-01-01 2026-01-10 43200-Minute Average.csv",
@@ -259,6 +261,9 @@ pa11 <- pa11 %>% mutate(sensor_id = "pa11")
 pa_all <- bind_rows(
   pa1, pa2, pa3, pa4, pa5, pa6, pa7, pa8, pa9, pa10, pa11
 )
+
+write.csv(pa_all, "/Users/gabriellebenoit/Documents/GitHub/peru_air/pa_all.csv", row.names = FALSE)
+
 
 ```
 
@@ -488,6 +493,7 @@ pa_all <- pa_all %>%
     TRUE ~ sensor_id
   ))
 
+
 # PLOT 1: Raw data (as-is)
 p1 <- ggplot(pa_all, aes(x = sensor_id, y = pm2_5_cf_1)) +
   geom_boxplot(fill = "#440154FF", alpha = 0.7) +
@@ -526,5 +532,82 @@ ggsave("pm25_capped.png", p2, width = 10, height = 6, dpi = 300, bg = "white")
 cat("Done! Two plots created:\n")
 cat("1. pm25_raw.png - Shows all data as-is\n")
 cat("2. pm25_capped.png - Outliers >150 capped for better visualization\n")
+```
+
+
+## Adding location of sensor
+Unable to get this via the data download tool, need to use the API directly
+```{r}
+library(tidyverse)
+library(httr2)
+
+# Your PurpleAir API read key
+api_key <- "7E14E44F-ECCB-11F0-B596-4201AC1DC123"
+
+# Your list of sensor IDs
+sensor_ids <- c(129323,159005,159435,159465,159599,180021,180043,180073,180119,180251,180321)
+
+# Function to fetch one sensor's metadata
+get_sensor_coords <- function(sensor_id, api_key) {
+  
+  response <- request("https://api.purpleair.com/v1/sensors") |>
+    req_url_path_append(sensor_id) |>
+    req_headers(`X-API-Key` = api_key) |>
+    req_url_query(fields = "name,latitude,longitude") |>
+    req_perform()
+  
+  data <- response |> resp_body_json()
+  
+  tibble(
+    sensor_id   = sensor_id,
+    sensor_name = data$sensor$name,
+    latitude    = data$sensor$latitude,
+    longitude   = data$sensor$longitude
+  )
+}
+
+# Loop through all sensors, pause briefly between calls to be polite to the API
+sensor_locations <- map(sensor_ids, \(id) {
+  Sys.sleep(0.5)
+  get_sensor_coords(id, api_key)
+}) |> list_rbind()
+
+print(sensor_locations)
+
+# Join to your PurpleAir data
+unique(pa_all$sensor_id)
+unique(sensor_locations$sensor_id)
+
+pa_all <- pa_all %>%
+  mutate(sensor_id = case_when(
+    sensor_id == "129323" ~ "pa1",
+    sensor_id == "159005" ~ "pa2",
+    sensor_id == "159435" ~ "pa3",
+    sensor_id == "159465" ~ "pa4",
+    sensor_id == "159599" ~ "pa5",
+    sensor_id == "180021" ~ "pa6",
+    sensor_id == "180043" ~ "pa7",
+    sensor_id == "180073" ~ "pa8",
+    sensor_id == "180119" ~ "pa9",
+    sensor_id == "180251" ~ "pa10",
+    sensor_id == "180321" ~ "pa11",
+    TRUE ~ sensor_id
+  ))
+
+purpleair_with_coords <- pa_all |>
+  mutate(sensor_id = as.numeric(sensor_id)) |>
+  left_join(sensor_locations, by = "sensor_id")
+
+
+sensor_locations <- sensor_locations |>
+  mutate(sensor_id_name = c("pa1","pa2","pa3","pa4","pa5","pa6",
+                             "pa7","pa8","pa9","pa10","pa11"))
+
+purpleair_with_coords <- pa_all |>
+  left_join(sensor_locations, by = c("sensor_id" = "sensor_id_name"))
+
+
+write_csv(purpleair_with_coords, "/Users/gabriellebenoit/Documents/GitHub/peru_air/purpleair_with_coords.csv")
+
 ```
 
