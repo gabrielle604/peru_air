@@ -40,7 +40,7 @@ PFAQ = Pfeffer Activities of Daily Living questionnaire
 
 ```{r foundation}
 vars_keep <- c(
-  "var008","var009","var019","var042","var043","var044","var049","var050",
+  "var008","var009","var010", "var019","var042","var043","var044","var049","var050",
   "var052","var053","var054","var055","var056","varn031","var069_n","var070_n",
   "varn041","var079_a","var062","var063","var064","varn065","varn073","varn151",
   "observacio_detalle","var999","varn012_n","varn013_n","varn014_n","varn015_n",
@@ -66,6 +66,7 @@ base_monica_renamed <- base_monica_reduced %>%
     ## Geography / IDs
     district                = any_of("var008"),
     sector                  = any_of("var009"),
+    conglomerado            = any_of("var010"),
     national_id             = any_of("var019"),
     region                  = any_of("region"),
 
@@ -157,7 +158,9 @@ base_monica_renamed <- base_monica_reduced %>%
     observation_detail      = any_of("observacio_detalle")
   )
 
-write.csv(base_monica_renamed, "cleaned_data.csv", row.names = FALSE)
+write.csv(base_monica_renamed, "/Users/gabriellebenoit/Documents/GitHub/peru_air/cleaned_data.csv", row.names = FALSE)
+
+cleaned_data <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/cleaned_data.csv")
 
 ```
 
@@ -611,3 +614,87 @@ write_csv(purpleair_with_coords, "/Users/gabriellebenoit/Documents/GitHub/peru_a
 
 ```
 
+
+# Approach 2
+```{r}
+# Load and standardize each sector CSV from Google Maps
+# Helper function: lowercase column names, trim whitespace, add sector + join key
+clean_sector <- function(file, sector_name) {
+  df <- read_csv(file)
+  names(df) <- tolower(names(df))
+  df |> 
+    mutate(
+      sector = sector_name,
+      nombre = trimws(as.character(nombre)),
+      sector_cong = paste0(sector_name, "-", nombre)
+    )
+}
+
+sector1 <- clean_sector("/Users/gabriellebenoit/Documents/GitHub/peru_air/Neuroepidemiología DC- Sector 1 15122.csv", "Sector 1")
+sector2 <- clean_sector("/Users/gabriellebenoit/Documents/GitHub/peru_air/Neuroepidemiología DC- Sector 2 15118.csv", "Sector 2")
+sector4 <- clean_sector("/Users/gabriellebenoit/Documents/GitHub/peru_air/Neuroepidemiología DC- Sector 4 15117.csv", "Sector 4")
+
+# Sector 3 handled separately due to duplicate/inconsistent column names
+sector3 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/Neuroepidemiología DC- Sector 3 15121.csv") |>
+  select(WKT, nombre = Nombre, descripción = Descripción) |>
+  mutate(
+    sector = "Sector 3",
+    nombre = trimws(as.character(nombre)),
+    sector_cong = paste0("Sector 3-", nombre)
+  ) |>
+  rename_with(tolower)
+
+# Combine all sectors into one ---
+# Note: Sector 5 not included - no map points available yet (pending collaborator)
+merged_kmz <- bind_rows(sector1, sector2, sector3, sector4)
+
+# Add sector_cong to cleaned_data ---
+cleaned_data <- cleaned_data |>
+  mutate(
+    nombre = trimws(as.character(conglomerado)),
+    sector_cong = paste0(sector, "-", conglomerado)
+  )
+# Join cleaned_data to map points
+# many-to-many expected: up to 2 people interviewed per household
+merged_with_context <- merged_kmz |>
+  left_join(cleaned_data, by = "sector_cong", relationship = "many-to-many")
+
+# Check join quality
+cat("Total rows in merged file:", nrow(merged_with_context), "\n")
+cat("Rows with matched cleaned_data:", sum(!is.na(merged_with_context$age)), "\n")
+
+
+## STILL mismatched
+# How many sector_cong values overlap between the two datasets?
+sum(merged_kmz$sector_cong %in% cleaned_data$sector_cong)
+
+# Look at a few KMZ values that don't match anything in cleaned_data
+merged_kmz |>
+  filter(!sector_cong %in% cleaned_data$sector_cong) |>
+  select(sector_cong) |>
+  head(10)
+
+# And check what cleaned_data has for those same conglomerado numbers
+merged_kmz |>
+  filter(!sector_cong %in% cleaned_data$sector_cong) |>
+  mutate(conglomerado = as.numeric(nombre)) |>
+  pull(conglomerado) |>
+  unique() |>
+  head(10) -> unmatched_ids
+
+cleaned_data |>
+  filter(conglomerado %in% unmatched_ids) |>
+  select(conglomerado, sector) |>
+  arrange(conglomerado)
+
+
+
+
+
+
+
+# Export for QGIS ---
+# write_csv(merged_with_context, "/Users/gabriellebenoit/Documents/GitHub/peru_air/merged_with_context.csv")
+
+
+```
