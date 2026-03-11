@@ -1,7 +1,7 @@
 ---
 title: "grant_prep"
 author: "Gabrielle"
-date: "2026-01-08"
+date: "2026-01-18"
 output: html_document
 ---
 
@@ -38,7 +38,13 @@ Eder [Translated with DeepL.com]:
 
 PFAQ = Pfeffer Activities of Daily Living questionnaire
 
+4. Numbered by section. [Final version of the map](https://www.google.com/maps/d/edit?mid=1ZxIT6hY4dc9rtQl3oUCLNVQoDkfRK5w&usp=sharing) includes sector 5.
+
+5. New updated working dataset: "Dataset2025_PP.xlsx"
+
 ```{r foundation}
+base_monica <- read_excel("/Users/gabriellebenoit/Documents/GitHub/peru_air/Base_de_datos_Monica.xlsx")
+
 vars_keep <- c(
   "var008","var009","var010", "var019","var042","var043","var044","var049","var050",
   "var052","var053","var054","var055","var056","varn031","var069_n","var070_n",
@@ -55,7 +61,6 @@ vars_keep <- c(
 
 base_monica_reduced <- base_monica %>%
   select(any_of(vars_keep))
-
 ```
 
 

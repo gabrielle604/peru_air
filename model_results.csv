@@ -1,0 +1,47 @@
+"Outcome","Term","Estimate","SE","t_value"
+"ACE","(Intercept)",50.728,9.728,5.214
+"ACE","pm25_mean",-0.006,0.015,-0.381
+"ACE","age",-0.26,0.047,-5.589
+"ACE","sexMasculino",-1.408,1.413,-0.996
+"ACE","educationNinguno/ Sin educación",10.525,6.238,1.687
+"ACE","educationPostgrado",27.784,13.044,2.13
+"ACE","educationPrimaria",11.742,5.809,2.021
+"ACE","educationSecundaria",13.376,5.827,2.296
+"ACE","educationSuperior no universitaria",15.551,5.965,2.607
+"ACE","educationSuperior universitaria",12.268,6.286,1.952
+"ACE","employmentB. Sí, sin pago",0.223,2.353,0.095
+"ACE","employmentC. Sí, los dos, pagado y sin pago",4.63,6.636,0.698
+"ACE","employmentD. No trabajo actualmente porque me jubilé",-4.17,2.409,-1.731
+"ACE","employmentE. No trabajo actualmente por otro motivo",0.298,1.326,0.225
+"ACE","obesitySí (IMC ≥ 30)",1.292,1.157,1.117
+"ACE","gait_speed",0.077,0.219,0.354
+"ACE","smokingEx fumador",1.235,2.852,0.433
+"ACE","smokingNunca ha fumado",1.874,2.705,0.693
+"ACE","alcoholDiariamente",13.576,18.082,0.751
+"ACE","alcoholNunca o dejó de beber el año pasado",-0.213,1.238,-0.172
+"ACE","fuel_typeElectricidad",3.945,13.426,0.294
+"ACE","fuel_typeGas",2.016,7.107,0.284
+"ACE","fuel_typeLeña",1.018,7.717,0.132
+"RUDAS","(Intercept)",6.476,2.855,2.268
+"RUDAS","pm25_mean",0.002,0.004,0.473
+"RUDAS","age",0.081,0.014,5.946
+"RUDAS","sexMasculino",0.45,0.413,1.09
+"RUDAS","educationNinguno/ Sin educación",-3.147,1.828,-1.722
+"RUDAS","educationPostgrado",-6.402,3.858,-1.66
+"RUDAS","educationPrimaria",-3.068,1.703,-1.802
+"RUDAS","educationSecundaria",-3.126,1.708,-1.831
+"RUDAS","educationSuperior no universitaria",-3.323,1.748,-1.901
+"RUDAS","educationSuperior universitaria",-2.429,1.843,-1.318
+"RUDAS","employmentB. Sí, sin pago",0.026,0.686,0.037
+"RUDAS","employmentC. Sí, los dos, pagado y sin pago",-0.847,1.93,-0.439
+"RUDAS","employmentD. No trabajo actualmente porque me jubilé",1.089,0.703,1.549
+"RUDAS","employmentE. No trabajo actualmente por otro motivo",-0.055,0.387,-0.143
+"RUDAS","obesitySí (IMC ≥ 30)",-0.354,0.337,-1.049
+"RUDAS","gait_speed",-0.047,0.064,-0.745
+"RUDAS","smokingEx fumador",-0.201,0.832,-0.241
+"RUDAS","smokingNunca ha fumado",-0.523,0.79,-0.662
+"RUDAS","alcoholDiariamente",-4.724,5.325,-0.887
+"RUDAS","alcoholNunca o dejó de beber el año pasado",-0.018,0.362,-0.05
+"RUDAS","fuel_typeElectricidad",0.756,3.924,0.193
+"RUDAS","fuel_typeGas",0.323,2.087,0.155
+"RUDAS","fuel_typeLeña",0.281,2.264,0.124
