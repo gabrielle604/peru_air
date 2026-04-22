@@ -111,6 +111,8 @@ Read in 11 Purple Air Sensor Data, one by one
 
 # API: 7E14E44F-ECCB-11F0-B596-4201AC1DC123
 
+# sensors: 129323, 159005, 159435, 159465, 159599, 180021, 180043, 180073, 180119, 180251, 180321
+
 ```{r}
 pa1 <- read_csv(
   "/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 1-10-2026/download_puente_maria_2022_2026/LV_129323 2022-01-01 2026-01-10 43200-Minute Average.csv",
@@ -654,6 +656,9 @@ st_write(spatial_data_proj,
 saveRDS(spatial_data_proj,
         "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_data_final.rds")
 
+# Save as CSV 
+write.csv(spatial_data_proj,
+        "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_data_final.csv")
 ```
 ## Begin modeling
 
@@ -756,7 +761,7 @@ spatial_data_simple <- spatial_data_proj %>%
 dim(spatial_data_simple)
 table(spatial_data_simple$any_relevant_dem)
 
-# 1. Prepare data
+# Prepare data
 spatial_data_simple <- spatial_data_proj %>%
   select(any_relevant_dem, pm25_mean, age, sex, education) %>%
   filter(!is.na(any_relevant_dem)) %>%    # Drop NA in outcome
@@ -766,206 +771,446 @@ spatial_data_simple <- spatial_data_proj %>%
     education = fct_lump(education, n = 5) # keep top 5 levels, lump rest as "Other"
   )
 
-# 2. Fit multinomial logistic regression
-model_simple <- multinom(any_relevant_dem ~ pm25_mean + age + sex + education,
-                         data = spatial_data_simple)
-
-# 3. Extract coefficients and standard errors
-coefs <- summary(model_simple)$coefficients
-ses   <- summary(model_simple)$standard.errors
-
-# 4. Compute odds ratios and 95% confidence intervals
-odds_ratios <- exp(coefs)
-lower_ci <- exp(coefs - 1.96 * ses)
-upper_ci <- exp(coefs + 1.96 * ses)
-
-# 5. Tidy table: predictors as rows, outcomes as columns
-odds_table <- as.data.frame(coefs) %>%
-  rownames_to_column("Outcome_vs_Reference") %>%
-  pivot_longer(-Outcome_vs_Reference, names_to = "Predictor", values_to = "Coef") %>%
-  mutate(
-    Odds_Ratio = exp(Coef),
-    Lower_CI   = exp(Coef - 1.96 * ses[as.matrix(expand.grid(1:nrow(coefs), 1:ncol(coefs)))]),
-    Upper_CI   = exp(Coef + 1.96 * ses[as.matrix(expand.grid(1:nrow(coefs), 1:ncol(coefs)))])
-  ) %>%
-  select(Outcome_vs_Reference, Predictor, Odds_Ratio, Lower_CI, Upper_CI)
-
-# 6. View results
-odds_table
-  # each predictor is a row and the odds ratios (with 95% CI) are clearly displayed for each outcome vs "Sin DC severo"
 
 
-# Prettier table
-tidy_or <- as.data.frame(coefs) %>%
-  rownames_to_column("Outcome_vs_Reference") %>%
-  pivot_longer(-Outcome_vs_Reference, names_to = "Predictor", values_to = "Coef") %>%
-  mutate(
-    Odds_Ratio = exp(Coef),
-    Lower_CI   = exp(Coef - 1.96 * ses[as.matrix(expand.grid(1:nrow(coefs), 1:ncol(coefs)))]),
-    Upper_CI   = exp(Coef + 1.96 * ses[as.matrix(expand.grid(1:nrow(coefs), 1:ncol(coefs)))])
-  ) %>%
-  # Round numeric values
-  mutate(
-    Odds_Ratio = round(Odds_Ratio, 2),
-    Lower_CI = round(Lower_CI, 2),
-    Upper_CI = round(Upper_CI, 2)
-  ) %>%
-  # Combine OR and CI into one string
-  unite("OR_with_CI", Odds_Ratio, Lower_CI, Upper_CI, sep = " (", remove = FALSE) %>%
-  mutate(OR_with_CI = str_c(OR_with_CI, ")")) %>%
-  select(-Odds_Ratio, -Lower_CI, -Upper_CI) %>%
-  # Pivot wider so each outcome is a column
-  pivot_wider(names_from = Outcome_vs_Reference, values_from = OR_with_CI)
+# Re-level outcome
+spatial_data_simple <- spatial_data_simple %>%
+  mutate(any_relevant_dem = factor(any_relevant_dem)) %>%
+  mutate(any_relevant_dem = relevel(any_relevant_dem,
+                                    ref = "Sin DC severo"))
 
-# View publication-ready table
-tidy_or
+# Binary outcome
+spatial_data_simple <- spatial_data_simple %>%
+  mutate(dc_binary = ifelse(any_relevant_dem == "Sin DC severo", 0, 1))
 
+# Binary logistic
+model_binary <- glm(dc_binary ~ pm25_mean,
+                    data = spatial_data_simple,
+                    family = binomial)
 
-## Add clustered version, using conglomerado
+binary_results <- tidy(model_binary,
+                       exponentiate = TRUE,
+                       conf.int = TRUE)
 
+# Multinomial
+model_multinom <- multinom(any_relevant_dem ~ pm25_mean,
+                           data = spatial_data_simple)
+
+multinom_results <- tidy(model_multinom,
+                         exponentiate = TRUE,
+                         conf.int = TRUE)
 ```
-## Results, model simple
+# Results
 
-Main exposure:
+Comparing the odds of being in each decline category relative to no severe decline.
+1. Severe cognitive decline with functional impairment
+
+Outcome: DC severo con compromiso funcional vs Sin DC severo
+
+OR = 0.991
+95% CI: 0.982 – 1.000
+p = 0.062
+
+Interpretation:
+
+A 1-unit increase in PM2.5 is associated with about a 0.9% decrease in the odds of severe cognitive decline with functional impairment, relative to no severe decline.
+
+However, the confidence interval crosses 1. p > 0.05
+
+So the association is not statistically significant, though it is borderline (p ≈ 0.06).
+
+This suggests no clear evidence of association in this model.
+
+2. Severe cognitive decline without functional impairment
+
+Outcome: DC severo sin compromiso funcional vs Sin DC severo
+
+OR = 1.0007
+95% CI: 0.998 – 1.003
+p = 0.577
+
+Interpretation:
+
+PM2.5 exposure shows essentially no association with the odds of severe cognitive decline without functional impairment. The odds ratio is extremely close to 1, and the confidence interval tightly surrounds 1.
+
+Key Takeaways: 
+
+- No statistically significant association between PM2.5 and either cognitive decline category.
+- The first category shows a weak, borderline negative association, but it is not reliable.
+- The second category shows no effect at all.
 
 
-Significant covariates:
 
 
-Not significant: 
-
-Model fit: 
-
-NOTES:
-* ? deleted observations due to missingness.
-* PM2.5 results could reflect the temporal mismatch (sensors installed after the survey)
 
 
-## Results, model 2 (clustered at conglomerado)
-Key differences from model 1--
+# PM2.5 effects are rarely linear per 1 µg/m³, so interpreting a 1-unit OR often hides effects.
 
+An alternative approach is:
 
-Consistent findings:
-
-Takeaway: 
-
-## Sensitivity analyses & Interaction Model
+PM2.5 quartiles, or
+scaled PM2.5 (per SD).
 
 ```{r}
-## REVISIT THIS (it is old data)
+spatial_data_simple <- spatial_data_simple %>%
+  mutate(pm25_sd = scale(pm25_mean))
 
+# Binary logistic
+model_binary_sd <- glm(dc_binary ~ pm25_sd,
+                    data = spatial_data_simple,
+                    family = binomial)
 
-# Sensitivity 1: Puente Piedra only
-spatial_pp <- spatial_data_proj %>% filter(district == "Puente Piedra")
+binary_results_sd <- tidy(model_binary_sd,
+                       exponentiate = TRUE,
+                       conf.int = TRUE)
 
-model2_pp <- lmer(ace_score ~ pm25_mean +
-                    age + sex + education + employment +
-                    obesity + gait_speed + smoking + alcohol + fuel_type +
-                    (1 | conglomerado_chr),
-                  data = spatial_pp)
-summary(model2_pp)
+# Multinomial
+model_multinom_sd <- multinom(any_relevant_dem ~ pm25_sd,
+                           data = spatial_data_simple)
 
-# Sensitivity 2: RUDAS as outcome
-model2_rudas <- lmer(rudas_score ~ pm25_mean +
-                       age + sex + education + employment +
-                       obesity + gait_speed + smoking + alcohol + fuel_type +
-                       (1 | conglomerado_chr),
-                     data = spatial_data_proj)
-summary(model2_rudas)
-
-# Interaction: PM2.5 x education
-model2_interaction <- lmer(ace_score ~ pm25_mean * education +
-                             age + sex + employment +
-                             obesity + gait_speed + smoking + alcohol + fuel_type +
-                             (1 | conglomerado_chr),
-                           data = spatial_data_proj)
-summary(model2_interaction)
+multinom_results_sd <- tidy(model_multinom_sd,
+                         exponentiate = TRUE,
+                         conf.int = TRUE)
 ```
-Does the effect of PM2.5 on cognition differ by education level?
 
 
-
-## [REVISIT THIS -- OLD DATA] Another idea: highways as proxy for poor air quality
+# Get PM 10 data
+Use the Purple Air data download tool. 
 ```{r}
-# Download major roads in the Puente Piedra area
-highways <- opq(bbox = c(-77.15, -11.90, -77.05, -11.83)) %>%
-  add_osm_feature(key = "highway", 
-                  value = c("motorway", "trunk", "primary", "secondary")) %>%
-  osmdata_sf()
 
-highway_lines <- highways$osm_lines %>%
-  st_transform(32718)  # reproject to match your other layers
+pm_129323 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/129323 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
 
-# Save for QGIS
-st_write(highway_lines,
-         "/Users/gabriellebenoit/Documents/GitHub/peru_air/highways.gpkg",
-         delete_dsn = TRUE)
+pm_159005 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/159005 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
 
-# Distance from each participant point to nearest highway
-spatial_data_proj$dist_highway_m <- as.numeric(
-  st_distance(spatial_data_proj %>% st_transform(32718),
-              highway_lines %>% st_union()) %>%
-  apply(1, min)
+pm_159435 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/159435 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_159465 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/159465 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_159599 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/159599 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_180021 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/180021 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_180043 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/180043 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_180073 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/180073 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_180119 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/180119 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_180251 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/180251 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+pm_180321 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026/180321 2022-01-01 2026-01-10 43200-Minute Average.csv",
+                   show_col_types = FALSE
+                   ) %>% clean_names()
+
+# sensors: 129323, 159005, 159435, 159465, 159599, 180021, 180043, 180073, 180119, 180251, 180321
+
+# explicitly add sensor id
+pm_129323 <- pm_129323 %>% mutate(sensor_id = "129323")
+pm_159005 <- pm_159005 %>% mutate(sensor_id = "159005")
+pm_159435 <- pm_159435 %>% mutate(sensor_id = "159435")
+pm_159465 <- pm_159465 %>% mutate(sensor_id = "159465")
+pm_159599 <- pm_159599 %>% mutate(sensor_id = "159599")
+pm_180021 <- pm_180021 %>% mutate(sensor_id = "180021")
+pm_180043 <- pm_180043 %>% mutate(sensor_id = "180043")
+pm_180073 <- pm_180073 %>% mutate(sensor_id = "180073")
+pm_180119 <- pm_180119 %>% mutate(sensor_id = "180119")
+pm_180251 <- pm_180251 %>% mutate(sensor_id = "180251")
+pm_180321 <- pm_180321 %>% mutate(sensor_id = "180321")
+
+
+pm10_all <- bind_rows(
+  pm_129323, pm_159005, pm_159435, pm_159465, pm_159599, pm_180021, pm_180043, pm_180073, pm_180119, pm_180251, pm_180321
 )
 
-summary(spatial_data_proj$dist_highway_m)
+write.csv(pm10_all, "/Users/gabriellebenoit/Documents/GitHub/peru_air/pm10_all.csv", row.names = FALSE)
 
-# Calculate distance from each participant to nearest highway
-spatial_data_proj <- spatial_data_proj %>%
-  st_transform(32718)
 
-highway_lines <- highways$osm_lines %>%
-  st_transform(32718)
-
-# Distance to nearest highway for each participant
-spatial_data_proj$dist_highway_m <- as.numeric(
-  st_distance(spatial_data_proj, st_union(highway_lines))
-)
-
-summary(spatial_data_proj$dist_highway_m)
-hist(spatial_data_proj$dist_highway_m, main = "Distance to nearest highway (m)")
-
-# Save the highway data
-st_write(highway_lines,
-         "/Users/gabriellebenoit/Documents/GitHub/peru_air/highways.gpkg",
-         delete_dsn = TRUE)
 ```
 
-## Add highways data to both models
+######### begin adapting the code here
+
+## Summary by sensor
+
+ab_summary table:
+- internal consistency
+- sensor reliability
+- whether any sensor is systematically noisy
 
 ```{r}
-spatial_data_proj <- spatial_data_proj %>%
-  mutate(dist_highway_km = dist_highway_m / 1000)
+pm10_all <- pm10_all %>%
+  mutate(
+    ab_diff = pm2_5_cf_1_a - pm2_5_cf_1_b,
+    ab_abs_diff = abs(ab_diff)
+  )
 
-# Re-run both models with km instead
-model2_ace_highway <- lmer(ace_score ~ pm25_mean + dist_highway_km +
-                             age + sex + education + employment +
-                             obesity + gait_speed + smoking + alcohol + fuel_type +
-                             (1 | conglomerado_chr),
-                           data = spatial_data_proj)
+ab_summary <- pa_all %>%
+  group_by(sensor_id) %>%
+  summarise(
+    mean_abs_diff = mean(ab_abs_diff, na.rm = TRUE),
+    median_abs_diff = median(ab_abs_diff, na.rm = TRUE),
+    pct_large_diff = mean(ab_abs_diff > 5, na.rm = TRUE) * 100,
+    n = n(),
+    .groups = "drop"
+  )
 
-model2_rudas_highway <- lmer(rudas_score ~ pm25_mean + dist_highway_km +
-                               age + sex + education + employment +
-                               obesity + gait_speed + smoking + alcohol + fuel_type +
-                               (1 | conglomerado_chr),
-                             data = spatial_data_proj)
-
-summary(model2_ace_highway)
-summary(model2_rudas_highway)
 ```
 
-distance to hwy is non-significant in both models (t=0.19 for ACE, t=-0.67 for RUDAS). No association between highway proximity and cognitive scores.
+## Investigate 
 
-Consistent null results — dist_highway_km is non-significant in both models (t=0.19 for ACE, t=-0.67 for RUDAS). No scaling warning this time either.
+Stratify A–B agreement by month (to detect firmware periods)
+```{r}
+# Create monthly agreement summary
+ab_monthly <- pa_all %>%
+  mutate(
+    time_stamp = as.Date(time_stamp),
+    year_month = floor_date(time_stamp, "month")
+  ) %>%
+  group_by(sensor_id, year_month) %>%
+  summarise(
+    n_obs = n(),
+    mean_diff = mean(ab_diff, na.rm = TRUE),
+    sd_diff = sd(ab_diff, na.rm = TRUE),
+    mean_abs_diff = mean(ab_abs_diff, na.rm = TRUE),
+    median_abs_diff = median(ab_abs_diff, na.rm = TRUE),
+    pct_large_diff = mean(ab_abs_diff > 5, na.rm = TRUE) * 100,
+    # Correlation between channels A and B
+    cor_ab = cor(pm2_5_cf_1_a, pm2_5_cf_1_b, use = "complete.obs"),
+    # IQR of absolute differences (robustness check)
+    iqr_abs_diff = IQR(ab_abs_diff, na.rm = TRUE),
+    .groups = "drop"
+  )
 
-Overall summary of all  analyses:
-Neither PM2.5 nor highway proximity is associated with cognitive scores (ACE or RUDAS) in this sample. The only consistent predictors are:
+# View the monthly summary
+print(ab_monthly)
 
-Age (stronger predictor across both outcomes)
-Education (strongly predicts ACE but not RUDAS, as expected given RUDAS design)
+# Identify potential firmware change points
+# Look for months with notable shifts in agreement metrics
+ab_monthly <- ab_monthly %>%
+  group_by(sensor_id) %>%
+  arrange(year_month) %>%
+  mutate(
+    # Change from previous month
+    delta_mean_abs = mean_abs_diff - lag(mean_abs_diff),
+    delta_cor = cor_ab - lag(cor_ab),
+    # Flag large changes (adjust thresholds as needed)
+    flag_agreement_shift = abs(delta_mean_abs) > 1.0 | abs(delta_cor) > 0.1
+  ) %>%
+  ungroup()
 
-The most likely explanations for the null air pollution findings:
+# Summary: overall monthly pattern (across all sensors)
+ab_monthly_overall <- ab_monthly %>%
+  group_by(year_month) %>%
+  summarise(
+    n_sensors = n(),
+    avg_mean_abs_diff = mean(mean_abs_diff, na.rm = TRUE),
+    avg_cor_ab = mean(cor_ab, na.rm = TRUE),
+    n_flagged = sum(flag_agreement_shift, na.rm = TRUE),
+    .groups = "drop"
+  )
 
-Temporal mismatch — sensors installed after the 2022 survey
-Limited spatial variability in PM2.5 — only 11 sensors across a relatively small area, so everyone gets a similar exposure estimate
-The population may not have sufficient exposure contrast to detect an effect
+print(ab_monthly_overall)
+
+# Visualization: time series of agreement by month
+ggplot(ab_monthly, aes(x = year_month, y = mean_abs_diff, color = sensor_id)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "A-B Channel Agreement Over Time",
+    subtitle = "Mean absolute difference by sensor and month",
+    x = "Month",
+    y = "Mean |A - B|",
+    color = "Sensor"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Correlation over time
+ggplot(ab_monthly, aes(x = year_month, y = cor_ab, color = sensor_id)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0.95, linetype = "dashed", color = "red") +
+  labs(
+    title = "A-B Channel Correlation Over Time",
+    subtitle = "Pearson correlation by sensor and month",
+    x = "Month",
+    y = "Correlation (A, B)",
+    color = "Sensor"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Heatmap: mean absolute difference by sensor × month
+ggplot(ab_monthly, aes(x = year_month, y = sensor_id, fill = mean_abs_diff)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  labs(
+    title = "A-B Agreement Heatmap",
+    x = "Month",
+    y = "Sensor",
+    fill = "Mean |A - B|"
+  ) +
+  theme_minimal()
+```
+
+
+## Plots
+
+Embed descriptive plots
+
+```{r, echo=FALSE}
+pa_all %>%
+  mutate(ab_abs_diff = abs(pm2_5_cf_1_a - pm2_5_cf_1_b)) %>%
+  ggplot(aes(x = ab_abs_diff)) +
+  geom_histogram(binwidth = 0.5) +
+  facet_wrap(~ sensor_id, scales = "free_y") +
+  labs(
+    title = "Absolute Difference Between PM2.5 A and B Channels",
+    x = "|A − B| (µg/m³)",
+    y = "Count"
+  )
+```
+
+## Quality control of PM2.5 measurements.
+
+To assess internal consistency of PurpleAir PM2.5 measurements, we evaluated agreement between the dual A and B sensing channels. For each observation, we calculated the absolute difference between channels (|A − B|). Observations with |A − B| > 10 µg/m³ were flagged as exhibiting poor channel agreement, consistent with established PurpleAir quality assurance practices. These flagged observations were excluded from primary analyses, and sensitivity analyses were conducted to evaluate robustness to alternative inclusion criteria.
+
+```{r}
+pa_all <- pa_all %>%
+  mutate(
+    ab_abs_diff = abs(pm2_5_cf_1_a - pm2_5_cf_1_b),
+    ab_qc_flag = ab_abs_diff > 10
+  )
+
+
+pa_all %>%
+  group_by(sensor_id) %>%
+  summarize(
+    n_obs = n(),
+    n_flagged = sum(ab_qc_flag, na.rm = TRUE),
+    pct_flagged = mean(ab_qc_flag, na.rm = TRUE) * 100,
+    max_ab_diff = max(ab_abs_diff, na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_flagged))
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+## Quick Summary of pm2.5 across all sensors
+```{r}
+pm_summary <- pa_all %>%
+  group_by(sensor_id) %>%
+  summarise(
+    min = min(pm2_5_cf_1, na.rm = TRUE),
+    q25 = quantile(pm2_5_cf_1, 0.25, na.rm = TRUE),
+    median = median(pm2_5_cf_1, na.rm = TRUE),
+    mean = mean(pm2_5_cf_1, na.rm = TRUE),
+    q75 = quantile(pm2_5_cf_1, 0.75, na.rm = TRUE),
+    max = max(pm2_5_cf_1, na.rm = TRUE),
+    n = n()
+  )
+
+print(pm_summary)
+
+kable(pm_summary, digits = 1, 
+      caption = "PM2.5 Summary Statistics by Sensor") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = FALSE) %>%
+  row_spec(0, bold = TRUE, color = "black", background = "white") %>%
+  row_spec(1:nrow(pm_summary), color = "black", background = "white")
+
+# Quick visual comparison
+ggplot(pa_all, aes(x = sensor_id, y = pm2_5_cf_1)) +
+  geom_boxplot() +
+  labs(title = "PM2.5 Distribution by Sensor",
+       x = "Sensor", y = "PM2.5 (μg/m³)") +
+  theme_minimal()
+```
+
+
+## Simple visualization 
+
+```{r}
+# Simple PM2.5 Boxplots for Lima, Peru Purple Air Sensors
+# Two approaches: (1) raw data, (2) outliers capped at 150 μg/m³
+
+# Rename sensors with Purple Air codes and district suffix
+pa_all <- pa_all %>%
+  mutate(sensor_id = case_when(
+    sensor_id == "pa1" ~ "129323_JM",
+    sensor_id == "pa2" ~ "159005_PP",
+    sensor_id == "pa3" ~ "159435_PP",
+    sensor_id == "pa4" ~ "159465_JM",
+    sensor_id == "pa5" ~ "159599_PP",
+    sensor_id == "pa6" ~ "180021_PP",
+    sensor_id == "pa7" ~ "180043_PP",
+    sensor_id == "pa8" ~ "180073_JM",
+    sensor_id == "pa9" ~ "180119_PP",
+    sensor_id == "pa10" ~ "180251_JM",
+    sensor_id == "pa11" ~ "180321_PP",
+    TRUE ~ sensor_id
+  ))
+
+
+# PLOT 1: Raw data (as-is)
+p1 <- ggplot(pa_all, aes(x = sensor_id, y = pm2_5_cf_1)) +
+  geom_boxplot(fill = "#440154FF", alpha = 0.7) +
+  labs(title = "PM2.5 Distribution by Sensor - Raw Data",
+       subtitle = "Lima, Peru (Puente Piedra and Jesus Maria regions)",
+       x = "Sensor ID",
+       y = "PM2.5 (μg/m³)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+print(p1)
+
+
+# PLOT 2: Outliers capped at 150 μg/m³
+# Note: Sensors pa5, pa6, and pa8 have extreme values (>1000 μg/m³) capped for visualization
+pa_capped <- pa_all %>%
+  mutate(pm2_5_capped = ifelse(pm2_5_cf_1 > 150, 150, pm2_5_cf_1))
+
+p2 <- ggplot(pa_capped, aes(x = sensor_id, y = pm2_5_capped)) +
+  geom_boxplot(fill = "#35B779FF", alpha = 0.7) +
+  labs(title = "PM2.5 Distribution by Sensor - Outliers Capped at 150 μg/m³",
+       subtitle = "Lima, Peru (Puente Piedra and Jesus Maria regions)\nNote: Extreme values from 159599_PP, 180021_PP, 180073_JM capped for better visualization",
+       x = "Sensor ID",
+       y = "PM2.5 (μg/m³)",
+       caption = "Sensors 159599_PP (max=2444.7), 180021_PP (max=1050.9), 180073_JM (max=1917.0) have values capped at 150") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+print(p2)
+
+
+# Save both plots
+ggsave("pm25_raw.png", p1, width = 10, height = 6, dpi = 300, bg = "white")
+ggsave("pm25_capped.png", p2, width = 10, height = 6, dpi = 300, bg = "white")
+
+cat("Done! Two plots created:\n")
+cat("1. pm25_raw.png - Shows all data as-is\n")
+cat("2. pm25_capped.png - Outliers >150 capped for better visualization\n")
+```
+

@@ -1,0 +1,3135 @@
+---
+title: "Chapter 3: Environmental and Social Determinants of Cognitive Health in Puente Piedra, Peru"
+author: "Gabrielle Husted"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: true
+    latex_engine: xelatex
+fontsize: 12pt
+geometry: margin=1in
+linestretch: 2
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,      # hides code from output
+  warning = FALSE,      # hides warnings
+  message = FALSE,      # hides messages
+  fig.width  = 7,
+  fig.height = 4.5,
+  fig.align  = "center"
+)
+
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(purrr)
+library(lubridate)
+library(geosphere)  # for distHaversine
+library(naniar) # visualization of missingness
+library(lme4)
+library(broom.mixed)  # for tidy() on mixed models
+library(sandwich)
+library(lmtest)
+library(logistf)
+library(readxl)
+library(stringr)
+library(tidyverse)
+library(janitor)
+library(knitr)
+library(kableExtra)
+library(viridis)  # colorblind-friendly colors
+library(httr2)
+library(sf)
+library(lme4)
+library(broom)
+library(osmdata)
+library(nnet)
+library(forcats)
+library(gtsummary)
+library(car)
+library(writexl)
+library(ggeffects)
+
+
+recode <- dplyr::recode  # fix masking conflict
+
+
+
+```
+
+## Download Historical Purple Air Data via Data Download Tool
+
+Sensor history:
+<https://api.purpleair.com/#api-sensors-get-sensor-history>
+
+Fields:
+pm10.0_atm_a,pm10.0_atm_b,pm10.0_atm,voc_a,voc_b,voc,humidity,humidity_a,humidity_b,
+temperature,temperature_a,temperature_b,pm2.5_atm_a,pm2.5_atm_b,pm2.5_atm
+
+Date range: 22-01-01 to 26-01-10
+
+1-month average
+
+```{r purpleair_clean_pipeline, message=FALSE, warning=FALSE}
+
+# 1. READ + LABEL SENSORS \ raw data import
+pa_159005 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026(1)/159005 2022-01-01 2026-01-10 43200-Minute Average.csv", show_col_types = FALSE) %>% clean_names() %>% mutate(sensor_id = "159005")
+pa_159435 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026(1)/159435 2022-01-01 2026-01-10 43200-Minute Average.csv", show_col_types = FALSE) %>% clean_names() %>% mutate(sensor_id = "159435")
+pa_159599 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026(1)/159599 2022-01-01 2026-01-10 43200-Minute Average.csv", show_col_types = FALSE) %>% clean_names() %>% mutate(sensor_id = "159599")
+pa_180021 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026(1)/180021 2022-01-01 2026-01-10 43200-Minute Average.csv", show_col_types = FALSE) %>% clean_names() %>% mutate(sensor_id = "180021")
+pa_180043 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026(1)/180043 2022-01-01 2026-01-10 43200-Minute Average.csv", show_col_types = FALSE) %>% clean_names() %>% mutate(sensor_id = "180043")
+pa_180119 <- read_csv("/Users/gabriellebenoit/Documents/GitHub/peru_air/PurpleAir Download 4-7-2026(1)/180119 2022-01-01 2026-01-10 43200-Minute Average.csv", show_col_types = FALSE) %>% clean_names() %>% mutate(sensor_id = "180119")
+
+purpleair_all <- bind_rows(
+  pa_159005, pa_159435, pa_159599,
+  pa_180021, pa_180043, pa_180119
+)
+
+# 2. CLEAN QC + FEATURE CREATION (MY OWN A/B + averages)
+
+clean_purpleair_ab <- function(df) {
+  
+  df |>
+    mutate(
+      datetime = as.POSIXct(time_stamp, origin = "1970-01-01", tz = "UTC"),
+      month    = floor_date(datetime, "month"),
+      sensor_id = as.factor(sensor_id),
+      
+      # --- QC (A/B agreement) ---
+      diff_pm25 = abs(pm2_5_atm_a - pm2_5_atm_b),
+      diff_pm10 = abs(pm10_0_atm_a - pm10_0_atm_b),
+      
+      reldiff_pm25 = diff_pm25 / ((pm2_5_atm_a + pm2_5_atm_b) / 2),
+      reldiff_pm10 = diff_pm10 / ((pm10_0_atm_a + pm10_0_atm_b) / 2),
+      
+      flag_pm25 = diff_pm25 > 5 | reldiff_pm25 > 0.70,
+      flag_pm10 = diff_pm10 > 5 | reldiff_pm10 > 0.70,
+      flag = flag_pm25 | flag_pm10,
+      
+      # --- FINAL EXPOSURE DEFINITION ---
+      pm25_avg = (pm2_5_atm_a + pm2_5_atm_b) / 2,
+      pm10_avg = (pm10_0_atm_a + pm10_0_atm_b) / 2,
+      
+      # meteorology (corrected)
+      humidity_avg = humidity,
+      temperature_avg = temperature
+    ) |>
+    filter(!flag | is.na(flag))
+}
+
+purpleair_all <- clean_purpleair_ab(purpleair_all)
+
+# 3. A/B DIAGNOSTICS 
+ab_summary <- purpleair_all |>
+  mutate(
+    diff_pm25 = abs(pm2_5_atm_a - pm2_5_atm_b),
+    diff_pm10 = abs(pm10_0_atm_a - pm10_0_atm_b)
+  )
+
+# 4. FIGURE: A/B AGREEMENT HEATMAP
+monthly_ab <- purpleair_all |>
+  mutate(
+    diff_pm25 = abs(pm2_5_atm_a - pm2_5_atm_b),
+    diff_pm10 = abs(pm10_0_atm_a - pm10_0_atm_b),
+    month = floor_date(datetime, "month")
+  ) |>
+  group_by(sensor_id, month) |>
+  summarise(
+    mean_diff_pm25 = mean(diff_pm25, na.rm = TRUE),
+    mean_diff_pm10 = mean(diff_pm10, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+  # PM 2.5
+ggplot(monthly_ab, aes(month, sensor_id, fill = mean_diff_pm25)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  labs(title = "PM2.5 A–B Agreement")
+
+  # PM 10
+ggplot(monthly_ab, aes(month, sensor_id, fill = mean_diff_pm10)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  labs(title = "PM10 A–B Agreement")
+
+# 5. RAW TIME SERIES FIGURE
+plot_data <- purpleair_all |>
+  select(datetime, sensor_id,
+         pm25_avg, pm10_avg,
+         humidity_avg, temperature_avg) |>
+  pivot_longer(-c(datetime, sensor_id),
+               names_to = "variable",
+               values_to = "value")
+
+ggplot(plot_data, aes(datetime, value, color = sensor_id)) +
+  geom_line(alpha = 0.4) +
+  facet_wrap(~variable, scales = "free_y") +
+  labs(title = "Processed PurpleAir Time Series")
+
+# 6. SENSITIVITY ANSLYSIS
+compute_exposure <- function(data, abs_thresh, rel_thresh) {
+  
+  data |>
+    mutate(
+      diff_pm25 = abs(pm2_5_atm_a - pm2_5_atm_b),
+      diff_pm10 = abs(pm10_0_atm_a - pm10_0_atm_b),
+      
+      reldiff_pm25 = diff_pm25 / ((pm2_5_atm_a + pm2_5_atm_b) / 2),
+      reldiff_pm10 = diff_pm10 / ((pm10_0_atm_a + pm10_0_atm_b) / 2),
+      
+      flag = (diff_pm25 > abs_thresh | reldiff_pm25 > rel_thresh) |
+             (diff_pm10 > abs_thresh | reldiff_pm10 > rel_thresh)
+    ) |>
+    filter(!flag | is.na(flag)) |>
+    group_by(sensor_id) |>
+    summarise(
+      mean_pm25 = mean(pm25_avg, na.rm = TRUE),
+      mean_pm10 = mean(pm10_avg, na.rm = TRUE),
+      mean_humidity = mean(humidity_avg, na.rm = TRUE),
+      mean_temperature = mean(temperature_avg, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    
+    mutate(
+      abs_thresh = abs_thresh,
+      rel_thresh = rel_thresh
+    )
+}
+
+# 7. FINAL EXPOSURE OBJECTS (TO USE IN MODELS)
+sensor_exposure_final <- compute_exposure(purpleair_all, 5, 0.70)
+
+# 8. SENSITIVITY DELTA
+abs_thresholds <- c(2, 5, 10, 20, Inf)
+rel_thresholds <- c(0.25, 0.50, 0.70, 1.0)
+
+threshold_grid <- expand.grid(
+  abs_thresh = abs_thresholds,
+  rel_thresh = rel_thresholds
+)
+
+sensitivity_results <- pmap_dfr(threshold_grid, function(abs_thresh, rel_thresh) {
+  compute_exposure(purpleair_all, abs_thresh, rel_thresh)
+})
+
+baseline <- sensitivity_results |>
+  filter(is.infinite(abs_thresh), rel_thresh == 1.0) |>
+  select(sensor_id, base_pm25 = mean_pm25, base_pm10 = mean_pm10)
+
+sensitivity_delta <- sensitivity_results |>
+  left_join(baseline, by = "sensor_id") |>
+  mutate(
+    delta_pm25 = mean_pm25 - base_pm25,
+    delta_pm10 = mean_pm10 - base_pm10
+  )
+
+# 9. DROP RAW CHANNELS
+
+purpleair_all <- purpleair_all |>
+  select(
+    -pm2_5_atm_a, -pm2_5_atm_b,
+    -pm10_0_atm_a, -pm10_0_atm_b,
+    -voc, -voc_a, -voc_b
+  )
+```
+
+## Visualizations: Processed Exposure Time Series
+
+```{r}
+vars_of_interest <- c("humidity_avg", "temperature_avg", "pm25_avg", "pm10_avg")
+
+plot_data <- purpleair_all |>
+  select(datetime, sensor_id, all_of(vars_of_interest)) |>
+  pivot_longer(all_of(vars_of_interest),
+               names_to = "variable",
+               values_to = "value")
+
+ggplot(plot_data, aes(x = datetime, y = value, color = sensor_id)) +
+  geom_line(alpha = 0.4, linewidth = 0.3) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "PurpleAir Time Series (Post-QC Exposure Variables)",
+    x = NULL, y = NULL, color = "Sensor"
+  ) +
+  theme_minimal()
+
+plot_data_capped <- plot_data |>
+  group_by(variable) |>
+  mutate(
+    lo = quantile(value, 0.01, na.rm = TRUE),
+    hi = quantile(value, 0.99, na.rm = TRUE),
+    value = pmin(pmax(value, lo), hi)
+  ) |>
+  ungroup()
+
+ggplot(plot_data_capped, aes(x = datetime, y = value, color = sensor_id)) +
+  geom_line(alpha = 0.4, linewidth = 0.3) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Capped Time Series (1st–99th percentile) — Exposure Variables",
+    x = NULL, y = NULL, color = "Sensor"
+  ) +
+  theme_minimal()
+
+sensor_exposure_final |>
+  select(mean_pm25, mean_pm10,
+         mean_humidity, mean_temperature) |>
+  
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "value") |>
+  
+  group_by(variable) |>
+  summarise(
+    n      = sum(!is.na(value)),
+    mean   = mean(value, na.rm = TRUE),
+    sd     = sd(value, na.rm = TRUE),
+    median = median(value, na.rm = TRUE),
+    p25    = quantile(value, 0.25, na.rm = TRUE),
+    p75    = quantile(value, 0.75, na.rm = TRUE),
+    min    = min(value, na.rm = TRUE),
+    max    = max(value, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+    mutate(
+  variable = case_when(
+    variable == "mean_pm25"        ~ "PM2.5 (µg/m³)",
+    variable == "mean_pm10"        ~ "PM10 (µg/m³)",
+    variable == "mean_humidity"    ~ "Humidity (%)",
+    variable == "mean_temperature" ~ "Temperature (°F)",
+    TRUE                           ~ variable
+  )
+  )
+```
+
+## Adding location of sensor
+
+Unable to get this via the data download tool, need to use the API
+directly
+
+```{r}
+#  PurpleAir API read key
+api_key <- "7E14E44F-ECCB-11F0-B596-4201AC1DC123"
+
+# Your list of sensor IDs
+sensor_ids <- c(159005,159435,159599,180021,180043,180119)
+
+# Function to fetch one sensor's metadata
+get_sensor_coords <- function(sensor_id, api_key) {
+  response <- request("https://api.purpleair.com/v1/sensors") |>
+    req_url_path_append(sensor_id) |>
+    req_headers(`X-API-Key` = api_key) |>
+    req_url_query(fields = "name,latitude,longitude") |>
+    req_perform()
+  
+  data <- response |> resp_body_json()
+  
+  tibble(
+    sensor_id   = sensor_id,
+    sensor_name = data$sensor$name,
+    latitude    = data$sensor$latitude,
+    longitude   = data$sensor$longitude
+  )
+}
+
+# Loop through all sensors
+sensor_locations <- map(sensor_ids, \(id) {
+  Sys.sleep(0.5)
+  get_sensor_coords(id, api_key)
+}) |> list_rbind()
+
+# Strip suffix from purpleair_all_clean sensor_id and join
+purpleair_all_with_coords <- sensor_exposure_final %>%
+  mutate(sensor_id_clean = as.numeric(gsub("_.*", "", sensor_id))) %>%
+  left_join(sensor_locations, by = c("sensor_id_clean" = "sensor_id"))
+
+# Check
+table(is.na(purpleair_all_with_coords$latitude))
+print(purpleair_all_with_coords)
+
+write_csv(purpleair_all_with_coords, "/Users/gabriellebenoit/Documents/GitHub/peru_air/purpleair_all_with_coords.csv")
+
+# Save as a spatial file
+purpleair_spatial <- purpleair_all_with_coords %>%
+  distinct(sensor_id, sensor_name, latitude, longitude) %>%  # one row per sensor
+  filter(!is.na(latitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  st_transform(32718)  # reproject to match your other layers
+
+st_write(purpleair_spatial,
+         "/Users/gabriellebenoit/Documents/GitHub/peru_air/purpleair__all_sensors.gpkg",
+         delete_dsn = TRUE)
+
+
+```
+
+## Socio-demographic Data
+
+New map, numbered by section. [Final version of the
+map](https://www.google.com/maps/d/edit?mid=1ZxIT6hY4dc9rtQl3oUCLNVQoDkfRK5w&usp=sharing)
+includes sector 5.
+
+Confirmed (as of March 25th, 2026) working dataset: "Base de datos
+(Monica)\_09.16.2024_MN edits 09.19.2024 copy 3.xlsx"
+
+## Primary variables of interest
+
+Cognitive scores: - ACE - RUADS - PFAQ - Dementia - Dementia AM -
+Dementia AJ - Dementia AJ ALT - deterioro cognitivo
+
+Exposure-related: - pollution (pm2.5, pm10) - temperature - humidity
+
+Geography: (account for clustering) - Distrito - Sector -
+Conglomerado/pin
+
+Core standard confounders: - age - sex - education - occupation
+
+Health-related: - bmi - glucose_lev - hypertension
+
+Socioeconomic: - overcrowding - health_insurance - civil_stat - SES
+level (A - E)
+
+```{r}
+# Load in the socio-cog data, accounting for the fact that the first row of data are actually column names
+updated_base_data <- read_excel(
+  "/Users/gabriellebenoit/Documents/GitHub/peru_air/Base de datos (Monica)_09.16.2024_MN edits 09.19.2024 copy 3.xlsx")
+
+updated_base_data <- updated_base_data %>%
+  slice(-1)
+
+# Select relevant variables and pare back the data
+
+vars_keep_new <- c(
+  "var008",   # District
+  "var009",   # Sector
+  "var010",  # Conglomerado
+  "demencia", # Todos (para definir demencia segun RUDAS o ACE-III + PFAQ)
+  "demencia_am", # Adulto mayor (no DC, DCL, demencia, segun solo RUDAS)
+  "demencia_aj_alt", # Adulto joven (DC o no DC, segun solo ACE-III)
+  "KL",   # Deterioro cognitivo
+  "ace_cal",
+  "rudas",
+  "rudas_cal",
+  "pfaq", 
+  "var051", # sex
+  "var049", # age
+  "var055", # education
+  "var056", # civil_stat
+  "imc", # bmi
+  "varn041", # glucose_lev
+  "var059", # occupation
+  "var061_cat...444", # health insurance
+  "var078", # chronic disease
+  "hta", # hypertension
+  "lengua_mat", # native language
+  "hacinamiento", # overcrowding
+  "nse_cat", # nivel socioeconomico
+  "nse_n_cat",
+  "nse_n_cat_inv"
+)
+
+updated_trimmed <- updated_base_data[, vars_keep_new]
+
+# Clean the data
+updated_trimmed_renamed <- updated_trimmed %>%
+  rename(
+    district              = "var008",
+    sector                = "var009",
+    conglomerado          = "var010",
+    any_relevant_dem      = "demencia",
+    demencia_older        = "demencia_am",
+    demencia_younger      = "demencia_aj_alt",
+    cognitive_decline     = "KL",
+    ace_score             = "ace_cal",
+    rudas                 = "rudas",
+    rudas_cal             = "rudas_cal",
+    pfaq                  = "pfaq",
+    sex                   = "var051",
+    age                   = "var049",
+    education             = "var055",
+    civil_stat            = "var056",
+    bmi                   = "imc",
+    glucose_lev           = "varn041",
+    occupation            = "var059",
+    health_ins            = "var061_cat...444",
+    chronic_dis           = "var078",
+    htn                   = "hta",
+    native_lang           = "lengua_mat",
+    overcrowding          = "hacinamiento",
+    ses_level             = "nse_cat", # nivel socioeconomico
+    ses_quint             = "nse_n_cat",
+    ses_quint_inv         = "nse_n_cat_inv"
+  ) %>% 
+  # ── Fix ses_level: remove rogue header row, set factor levels ──────────────
+  mutate(
+    ses_level = as.character(ses_level),
+    ses_level = na_if(ses_level, "ses_level"),
+    ses_level = factor(ses_level,
+                       levels = c("NSE E", "NSE D", "NSE C", "NSE B", "NSE A"))
+)
+
+# Confirm before saving
+table(updated_trimmed_renamed$ses_level, useNA = "always")
+# Expect: NSE E=66, NSE D=95, NSE C=352, NSE B=497, NSE A=80, NA=10
+
+
+# Save the data
+saveRDS(updated_trimmed_renamed, 
+        "/Users/gabriellebenoit/Documents/GitHub/peru_air/updated_trimmed_renamed.rds")
+
+write.csv(updated_trimmed_renamed, 
+          "/Users/gabriellebenoit/Documents/GitHub/peru_air/updated_trimmed_renamed.csv")
+```
+
+## Using the google map data
+
+```{r}
+# Load, deduplicate, and join — all one block
+
+kml_layers <- st_layers("/Users/gabriellebenoit/Documents/GitHub/peru_air/Neuroepidemiología_Puente_Piedra_Julio_2022.kml")
+layers <- kml_layers$name
+
+kml_data <- do.call(rbind, lapply(layers, function(layer) {
+  st_read("/Users/gabriellebenoit/Documents/GitHub/peru_air/Neuroepidemiología_Puente_Piedra_Julio_2022.kml",
+          layer = layer, quiet = TRUE)
+})) |>
+  (\(x) { cat("Raw KML rows:", nrow(x), "| Dupes:", sum(duplicated(x$Name)), "\n"); x })() |>
+  filter(!duplicated(Name)) |>        # dedup inline — cannot be skipped
+  (\(x) { cat("Clean KML rows:", nrow(x), "\n"); x })()
+
+# Prep survey IDs
+updated_trimmed_renamed <- updated_trimmed_renamed |>
+  mutate(conglomerado_chr = as.character(conglomerado))
+
+# Join
+spatial_data <- kml_data |>
+  rename(conglomerado_chr = Name) |>
+  right_join(updated_trimmed_renamed, by = "conglomerado_chr")
+  #  ^^^ right_join: keeps all rows from updated_trimmed_renamed (1099)
+  #      the 4 unmatched participants get NA geometry — expected
+
+cat("spatial_data rows:", nrow(spatial_data), "\n")  # expect 1099
+
+
+
+# Save files and outputs
+st_write(spatial_data,
+         "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_survey_data.gpkg",
+         delete_dsn = TRUE)
+
+write.csv(spatial_data,
+          "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_survey_data.csv",
+          row.names = FALSE)
+
+saveRDS(updated_trimmed_renamed,
+        "/Users/gabriellebenoit/Documents/GitHub/peru_air/updated_trimmed_renamed.rds")
+
+write.csv(updated_trimmed_renamed,
+          "/Users/gabriellebenoit/Documents/GitHub/peru_air/updated_trimmed_renamed.csv",
+          row.names = FALSE)
+
+```
+
+## Spatial Join for All Variables
+
+```{r}
+# Make sensors spatial
+# purpleair_all_with_coords already has sensor means + coordinates from code above
+sensors_spatial <- purpleair_all_with_coords |>
+  filter(!is.na(latitude), !is.na(longitude)) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(32718)
+
+# Project participant data
+spatial_data_proj <- spatial_data |>
+  st_transform(32718)
+
+# Nearest sensor join
+nearest_idx <- st_nearest_feature(spatial_data_proj, sensors_spatial)
+
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    nearest_sensor_id   = purpleair_all_with_coords$sensor_id_clean[nearest_idx],
+    nearest_sensor_name = purpleair_all_with_coords$sensor_name[nearest_idx],
+    exposure_humidity   = purpleair_all_with_coords$mean_humidity[nearest_idx],
+    exposure_temp       = purpleair_all_with_coords$mean_temperature[nearest_idx],
+    exposure_pm25       = purpleair_all_with_coords$mean_pm25[nearest_idx],
+    exposure_pm10       = purpleair_all_with_coords$mean_pm10[nearest_idx],
+    n_obs_sensor        = purpleair_all_with_coords$n_obs[nearest_idx]
+  )
+
+# Check
+head(spatial_data_proj[, c("conglomerado_chr", "nearest_sensor_name",
+                            "exposure_pm25", "exposure_pm10",
+                            "exposure_temp", "exposure_humidity")])
+
+# Check how many observations are missing for any_relevant_dem and dc_binary
+  # Then, drop observations that have NA
+      # 1. Check number of NAs in each variable
+spatial_data_proj |>
+  summarise(
+    n_na_any_relevant_dem = sum(is.na(any_relevant_dem)),
+    n_na_sensor_id        = sum(is.na(nearest_sensor_id))
+  )
+
+      # 2. Drop rows with any NA in these variables
+spatial_data_proj <- spatial_data_proj |>
+  filter(
+    !is.na(any_relevant_dem)
+  )
+
+
+# four observations are missing geometry, and consequently nearest_sensor_id values; see what the unmatched look like:
+spatial_data_proj |>
+  filter(is.na(nearest_sensor_id)) |>
+  select(any_relevant_dem, nearest_sensor_id, conglomerado_chr, conglomerado, geometry)
+
+# drop these four values
+spatial_data_proj <- spatial_data_proj |>
+  filter(!is.na(nearest_sensor_id))
+
+# make all zeros for rudas NA instead
+spatial_data_proj$rudas[spatial_data_proj$rudas == 0] <- NA
+
+
+# Save
+st_write(spatial_data_proj,
+         "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_data_final.gpkg",
+         delete_dsn = TRUE)
+
+saveRDS(spatial_data_proj,
+        "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_data_final.rds")
+
+write.csv(st_drop_geometry(spatial_data_proj),
+          "/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_data_final.csv",
+          row.names = FALSE)
+```
+
+## Explore which sensors were used, how many participants were assigned to it
+
+A few things to note: - 180119 and 159005 cover the bulk of participants
+(371 and 517) — results will be heavily influenced by these two
+sensors - 159435 and 180021 have very few participants assigned (4) —
+these are likely on the geographic periphery of the study area
+
+Limitations: exposure assignment was constrained to 6 sensors, with the
+majority of participants assigned to just 2 sensors — which reduces
+spatial variability in exposure estimates.
+
+# Load Data
+
+```{r}
+spatial_data_proj <- read_rds("/Users/gabriellebenoit/Documents/GitHub/peru_air/spatial_data_final.rds")
+```
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_id, nearest_sensor_name) |>
+  arrange(desc(n))
+
+# as a graphic
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_id, nearest_sensor_name) |>
+  ggplot(aes(x = reorder(nearest_sensor_name, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Participants Assigned per Nearest Sensor",
+       x = NULL, y = "Number of participants") +
+  theme_minimal() + scale_x_discrete(labels = c(
+  "GEOHealth_MiPeru_Chavinillo" = "MiPeru",
+  "GEOHealth_PuenteP_Estadio_1" = "PuenteP_Estadio",
+  "GEOHealth_SanMa_IE005" = "SanMa",
+  "GeoHealth_Comas_2055PAbril" = "Comas",
+  "GEOHealth_Ventanilla_NSBelen" = "Ventanilla",
+  "GEOHealth_Carab_VictorRaulHT" = "Carab"
+))
+```
+
+## Examine contextual variables -- clean
+
+```{r}
+# Re-level outcome
+spatial_data_proj <- spatial_data_proj %>%
+  mutate(any_relevant_dem = factor(any_relevant_dem)) %>%
+  mutate(any_relevant_dem = relevel(any_relevant_dem,
+                                    ref = "Sin DC severo"))
+
+# Binary outcome
+spatial_data_proj <- spatial_data_proj %>%
+  mutate(dc_binary = ifelse(any_relevant_dem == "Sin DC severo", 0, 1))
+
+
+# inspect education
+edu_counts <- spatial_data_proj |>
+  st_drop_geometry() |>
+  pull(education) |>
+  table(useNA = "always")
+print(as.data.frame(edu_counts))
+
+# COLLAPSE
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    education_cat = case_when(
+      education == 0                                             ~ "none",
+      as.numeric(education) >= 1 & as.numeric(education) <= 6  ~ "primary",
+      as.numeric(education) >= 7                                ~ "secondary_or_higher",
+      TRUE                                                       ~ NA_character_
+    ),
+    education_cat = factor(education_cat,
+                           levels = c("none", "primary", "secondary_or_higher"))
+  )
+
+table(spatial_data_proj$education_cat, spatial_data_proj$dc_binary)
+
+
+# inspect civil_stat
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(civil_stat) |>
+  arrange(desc(n))
+# inspect occupation
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(occupation) |>
+  arrange(desc(n))
+
+# COLLAPSE
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    civil_stat_cat = case_when(
+      civil_stat %in% c("Conviviente", "Casado(a)")    ~ "partnered",
+      civil_stat == "Soltero(a)"                        ~ "single",
+      civil_stat %in% c("Separado(a)", "Divorciado(a)",
+                        "Viudo(a)")                     ~ "separated_widowed",
+      TRUE                                              ~ NA_character_
+    ),
+    civil_stat_cat = factor(civil_stat_cat,
+                            levels = c("partnered", "single", "separated_widowed")),
+
+    occupation_cat = case_when(
+      occupation == "Amo(a) de casa"                    ~ "homemaker",
+      occupation %in% c("Auto-empleado(a)", "Freelance",
+                        "Empleado(a)")                  ~ "employed",
+      occupation %in% c("Sin empleo actual",
+                        "Jubilado(a)", "Estudiante")    ~ "not_employed",
+      TRUE                                              ~ NA_character_
+    ),
+    occupation_cat = factor(occupation_cat,
+                            levels = c("employed", "homemaker", "not_employed"))
+  )
+
+# Verify
+table(spatial_data_proj$civil_stat_cat, useNA = "always")
+table(spatial_data_proj$occupation_cat, useNA = "always")
+
+# trouble shoot a confounder that is perfectly predicting the outcome
+model_data_check <- spatial_data_proj |>
+  st_drop_geometry() |>
+  filter(!is.na(dc_binary)) |>
+  select(dc_binary, age, sex, education_cat, civil_stat_cat,
+         bmi, htn, native_lang, health_ins, occupation_cat, chronic_dis) |>
+  na.omit()
+
+for (var in c("education_cat", "civil_stat_cat", "occupation_cat",
+              "htn", "native_lang", "health_ins", "chronic_dis", "sex")) {
+  cat("\n---", var, "---\n")
+  print(table(model_data_check[[var]], model_data_check$dc_binary))
+}
+  # health_ins has the problem.  "Fuerzas armadas o policiales" has 46 participants and zero cognitive decline cases, causing complete separation. It also has too many levels generally. Collapse it:
+
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    health_ins_cat = case_when(
+      health_ins == "Seguro integral de salud (SIS)"      ~ "SIS",
+      health_ins == "Essalud"                             ~ "Essalud",
+      health_ins == "No está afiliado"                    ~ "uninsured",
+      health_ins %in% c("Fuerzas armadas o policiales",
+                        "Entidad prestadora de salud",
+                        "Seguro privado de salud",
+                        "No sabe")                        ~ "other",
+      TRUE                                                ~ NA_character_
+    ),
+    health_ins_cat = factor(health_ins_cat,
+                            levels = c("SIS", "Essalud", "uninsured", "other"))
+  )
+
+table(spatial_data_proj$health_ins_cat, spatial_data_proj$dc_binary)
+
+# htn
+model_data_check2 <- spatial_data_proj |>
+  st_drop_geometry() |>
+  filter(!is.na(dc_binary)) |>
+  select(dc_binary, age, sex, education_cat, civil_stat_cat,
+         bmi, htn, native_lang, health_ins_cat, occupation_cat, chronic_dis) |>
+  na.omit()
+
+table(model_data_check2$htn, model_data_check2$dc_binary)
+
+  # COLLAPSE
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    htn_cat = case_when(
+      htn == "Sin hipertensión"                          ~ "none",
+      htn %in% c("HTA sistólica", "HTA diastólica",
+                 "HTA sistodiastólica")                  ~ "hypertension",
+      TRUE                                               ~ NA_character_
+    ),
+    htn_cat = factor(htn_cat, levels = c("none", "hypertension"))
+  )
+
+table(spatial_data_proj$htn_cat, spatial_data_proj$dc_binary)
+
+
+# BMI
+spatial_data_proj <- spatial_data_proj |>
+  mutate(bmi = as.numeric(as.character(bmi)))
+
+# Verify
+class(spatial_data_proj$bmi)
+summary(spatial_data_proj$bmi)
+
+# SES level
+class(spatial_data_proj$ses_quint)
+summary(spatial_data_proj$ses_quint)
+
+table(spatial_data_proj$ses_level, useNA = "always")
+
+counts <- spatial_data_proj |>
+  count(any_relevant_dem)
+
+ggplot(spatial_data_proj, aes(x = any_relevant_dem, fill = ses_level)) +
+  geom_bar(position = "fill") +
+  geom_text(
+    data = counts,
+    aes(x = any_relevant_dem, y = 1.05, label = paste0("n = ", n)),
+    inherit.aes = FALSE
+  ) +
+  scale_x_discrete(labels = \(x) str_wrap(x, width = 10)) +
+  labs(
+    title = "Distribution of Dementia Status by SES Level",
+    x = "Dementia Status",
+    y = "Proportion",
+    fill = "Socioeconomic Status"
+  ) +
+  coord_cartesian(ylim = c(0, 1.1)) +
+  theme_minimal() +
+  scale_x_discrete(
+  labels = c(
+    "Sin DC severo" = "Cognitively Unimpaired", 
+    "DC severo con compromiso funcional" = "Cognitive impairment with functional impairment",
+    "DC severo sin compromiso funcional" = "Cognitive impairment without functional impairment"
+  )
+)
+
+
+confounders <- "age + sex + education_cat + civil_stat_cat + bmi + htn_cat + 
+                native_lang + health_ins_cat"
+```
+
+## Check missingness
+
+```{r}
+gg_miss_var(spatial_data_proj)
+
+# 1. How many events (dc_binary = 1)?
+table(spatial_data_proj$dc_binary)
+  ## 279 events
+
+# 2. How many complete cases does fit_robust is actually working with?
+spatial_data_proj |>
+  st_drop_geometry() |>
+  filter(!is.na(dc_binary)) |>
+  select(dc_binary, exposure_pm25, age, sex, education_cat, civil_stat_cat,
+         bmi, htn, native_lang, health_ins, occupation_cat, chronic_dis) |>
+  na.omit() |>
+  nrow()
+  ## 1,854 complete cases
+
+# exposure variable variance/values?
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(exposure_pm25)
+  ## essentially a 6-level factor masquerading as continuous
+
+```
+
+## Create standardized versions of PM 2.5, PM 10, temperature, and humidity
+
+\# and quartile for PM 2.5
+
+\# Interpretation: SD models: OR = dementia odds per 1 SD increase in
+exposure Quartile models: OR = dementia odds relative to lowest exposure
+group
+
+```{r}
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    pm25_sd = as.numeric(scale(exposure_pm25)),
+    pm10_sd = as.numeric(scale(exposure_pm10)),
+    temp_sd = as.numeric(scale(exposure_temp)),
+    humidity_sd = as.numeric(scale(exposure_humidity)),
+
+    pm25_q = ntile(exposure_pm25, 4),
+    pm25_q = factor(pm25_q,
+                    levels = 1:4,
+                    labels = c("Q1 lowest","Q2","Q3","Q4 highest"))
+  )
+
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    age = as.numeric(as.character(age))
+  )
+class(spatial_data_proj$age)
+```
+
+## Descriptive Exploration
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(dc_binary) |>
+  summarise(
+    n = n(),
+    pm25_mean = mean(exposure_pm25, na.rm = TRUE),
+    pm25_sd   = sd(exposure_pm25, na.rm = TRUE),
+    pm10_mean = mean(exposure_pm10, na.rm = TRUE),
+    pm10_sd   = sd(exposure_pm10, na.rm = TRUE)
+  )
+```
+
+\# boxplots \# pm 2.5
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  ggplot(aes(x = factor(dc_binary), y = exposure_pm25)) +
+  geom_boxplot() +
+  labs(
+    x = "Dementia status",
+    y = "PM2.5 exposure",
+    title = "PM2.5 exposure by dementia status"
+  ) +
+  theme_minimal()
+```
+
+# pm 10
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  ggplot(aes(x = factor(dc_binary), y = exposure_pm10)) +
+  geom_boxplot() +
+  labs(
+    x = "Dementia status",
+    y = "PM10 exposure",
+    title = "PM10 exposure by dementia status"
+  ) +
+  theme_minimal()
+```
+
+## Analysis (Thursday, April 9)
+
+1.  dc_binary or any_relevant_dem as primary outcome
+2.  stratified analyses for older and younger adults with their
+    continuous scores as secondary outcome
+
+\# determine how many NAs there are for any_relevant dementia,
+dc_binary, rudas, ace, pfaq \# how do they or do they not overlap?
+
+```{r}
+# 1. Define the variables of interest
+outcome_vars <- c("any_relevant_dem", "dc_binary", "rudas", "ace_score", "pfaq")
+
+# 2. Count NAs per row for just these columns
+na_per_row <- rowSums(is.na(spatial_data_proj[, outcome_vars]))
+
+# 3. See the distribution (how many are missing 0, 1, 2, ..., 5)
+table(na_per_row)
+  # 0 = observations iwth complete data for all 5 variables
+  # 1 = observations missing exactly one variable
+  # 5 = observations missing all 5 variables
+
+# alternative visual
+colSums(is.na(spatial_data_proj[, outcome_vars]))
+
+# Shows exactly which combinations of variables are most commonly missing together
+gg_miss_upset(spatial_data_proj[, outcome_vars])
+
+
+```
+
+\## Delete observations that are missing all five variables because they
+need at least one of those measures to be able to be in our analyses
+meaningfully.
+
+```{r}
+# Define the variables to check
+outcome_vars <- c("any_relevant_dem", "dc_binary", "rudas", "ace_score", "pfaq")
+
+# Filter to KEEP rows where NOT all 5 are NA
+spatial_data_proj <- spatial_data_proj %>%
+  filter(rowSums(is.na(select(., any_of(outcome_vars)))) < 5)
+
+# verification
+nrow(spatial_data_proj)
+
+```
+
+```{r}
+# Who got which test?
+spatial_data_proj |>
+  st_drop_geometry() |>
+  summarise(
+    n_rudas    = sum(!is.na(as.numeric(rudas))),
+    n_ace      = sum(!is.na(as.numeric(ace_score))),
+    n_pfaq     = sum(!is.na(as.numeric(pfaq))),
+    n_dc       = sum(!is.na(dc_binary))
+  )
+# rudas, n = 1066
+# ace, n = 753 
+# pfaq, n = 896
+# dc, n = 1066
+
+# 753 took rudas and ACE, 313 did not
+# 313 took rudas but not ACE
+
+# Age distribution by test
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(
+    took_rudas = !is.na(as.numeric(rudas)),
+    took_ace   = !is.na(as.numeric(ace_score))
+  ) |>
+  group_by(took_rudas, took_ace) |>
+  summarise(
+    mean_age = mean(as.numeric(age), na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+# Confirm age cutoff used to assign tests
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(
+    took_ace  = !is.na(as.numeric(ace_score)),
+    age_n     = as.numeric(age)
+  ) |>
+  group_by(took_ace) |>
+  summarise(
+    min_age  = min(age_n, na.rm = TRUE),
+    max_age  = max(age_n, na.rm = TRUE),
+    mean_age = mean(age_n, na.rm = TRUE),
+    n        = n()
+  )
+
+```
+
+## Primary analysis: full sample
+
+```{r}
+dc_binary ~ exposure + age + sex
+```
+
+## Secondary analysis: older adults (60+)
+
+```{r}
+as.numeric(rudas) ~ exposure + age + sex
+```
+
+## Secondary analysis: younger adults (30-59):
+
+```{r}
+as.numeric(ace_score) ~ exposure + age + sex
+# n = 1,365, continuous ACE score
+```
+
+## Create the age groups:
+
+```{r}
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    age_n     = as.numeric(age),
+    age_group = case_when(
+      age_n >= 60 ~ "older",
+      age_n <  60 ~ "younger",
+      TRUE        ~ NA_character_
+    ),
+    rudas_n   = as.numeric(rudas),
+    ace_n     = as.numeric(ace_score)
+  )
+```
+
+## Prep
+
+```{r}
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    age_n     = as.numeric(age),
+    age_group = case_when(
+      age_n >= 60 ~ "older",
+      age_n <  60 ~ "younger",
+      TRUE        ~ NA_character_
+    ),
+    rudas_n   = as.numeric(rudas),
+    ace_n     = as.numeric(ace_score),
+    across(c(exposure_pm25, exposure_pm10,
+             exposure_temp, exposure_humidity),
+           ~ as.numeric(scale(.)),
+           .names = "{.col}_z")
+  )
+```
+
+## How many unique conglomerados per sector?
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(sector) |>
+  summarise(
+    n_conglomerados = n_distinct(conglomerado_chr),
+    .groups = "drop"
+  ) |>
+  arrange(desc(n_conglomerados))
+```
+
+\# Confirm cluster counts
+
+```{r}
+length(unique(spatial_data_proj$conglomerado))  # expect 684
+length(unique(spatial_data_proj$sector))         # expect 5
+```
+
+Our data is such that administrative codes are not equal to spatial
+units. Many conglomerados values appear in multiple sectors. Some appear
+in 2 sectors. Some appear in 3 or 4 (e.g. 128,409, 480)... conglomerado
+is NOT globally unique.
+
+We have this hierarchy: -District: Puente Piedra -Sector (5 levels)
+-Conglomerado (reused within district, overlaps across sectors).. a
+local code system, not a globally unique cluster ID
+
+Requires TWO-WAY clustering or a composite ID derives from sector +
+conglomerado
+
+## Create Unique spatial cluster ID
+
+```{r}
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    cluster_id = paste(sector, conglomerado_chr, sep = "_")
+  )
+```
+
+## Standardize exposures
+
+```{r}
+spatial_data_proj <- spatial_data_proj |>
+  mutate(across(
+    c(exposure_pm25, exposure_pm10, exposure_temp, exposure_humidity),
+    ~ as.numeric(scale(.)),
+    .names = "{.col}_z"
+  ))
+```
+
+## Tidy: unified cluster robust model function
+
+```{r}
+run_cluster_model <- function(data, outcome, exposure, covariates,
+                              family = NULL,
+                              exponentiate = FALSE,
+                              outcome_label = "outcome") {
+
+  # ----------------------------
+  # 1. build model data
+  # ----------------------------
+  model_data <- data |>
+    st_drop_geometry() |>
+    select(all_of(c(outcome, exposure, covariates, "cluster_id"))) |>
+    na.omit()
+
+  # ----------------------------
+  # 2. formula
+  # ----------------------------
+  fml <- as.formula(
+    paste(outcome, "~", paste(c(exposure, covariates), collapse = " + "))
+  )
+
+  # ----------------------------
+  # 3. fit model
+  # ----------------------------
+  if (is.null(family)) {
+    model <- lm(fml, data = model_data)
+  } else {
+    model <- glm(fml, data = model_data, family = family)
+  }
+
+  # ----------------------------
+  # 4. cluster-robust SE
+  # ----------------------------
+  vcov_cl <- sandwich::vcovCL(model, cluster = model_data$cluster_id)
+
+  ct <- lmtest::coeftest(model, vcov = vcov_cl)
+
+  # ----------------------------
+  # 5. SAFE tidy conversion
+  # ----------------------------
+  ct_df <- as.data.frame(unclass(ct))
+  ct_df$term <- rownames(ct_df)
+  rownames(ct_df) <- NULL
+
+  colnames(ct_df)[1:4] <- c("estimate", "std.error", "statistic", "p.value")
+
+  # ----------------------------
+  # 6. keep exposure row only
+  # ----------------------------
+  ct_df <- ct_df |>
+    filter(term == exposure) |>
+    mutate(
+      conf.low  = estimate - 1.96 * std.error,
+      conf.high = estimate + 1.96 * std.error
+    )
+
+  # ----------------------------
+  # 7. transform if needed
+  # ----------------------------
+  if (!is.null(family) && exponentiate) {
+    ct_df <- ct_df |>
+      mutate(
+        estimate  = exp(estimate),
+        conf.low  = exp(conf.low),
+        conf.high = exp(conf.high)
+      )
+  }
+
+  # ----------------------------
+  # 8. add labels
+  # ----------------------------
+  ct_df |>
+    mutate(
+      exposure = exposure,
+      outcome  = outcome_label
+    )
+}
+```
+
+## Models
+
+\# Exposures
+
+```{r}
+exposures <- c("exposure_pm25_z",
+               "exposure_pm10_z",
+               "exposure_temp_z",
+               "exposure_humidity_z")
+```
+
+\# Binary
+
+```{r}
+bin_results <- bind_rows(lapply(exposures, function(x) {
+
+  run_cluster_model(
+    data = spatial_data_proj,
+    outcome = "dc_binary",
+    exposure = x,
+    covariates = c("age_n", "sex"),
+    family = binomial,
+    exponentiate = TRUE,
+    outcome_label = "DC binary (clustered)"
+  ) |>
+    mutate(exposure = x)
+}))
+```
+
+\# Rudas
+
+```{r}
+rudas_results <- bind_rows(lapply(exposures, function(x) {
+
+  run_cluster_model(
+    data = spatial_data_proj |> filter(age_group == "older"),
+    outcome = "rudas_n",
+    exposure = x,
+    covariates = c("age_n", "sex"),
+    family = NULL,
+    exponentiate = FALSE,
+    outcome_label = "RUDAS (clustered)"
+  ) |>
+    mutate(exposure = x)
+}))
+```
+
+\# ACE
+
+```{r}
+ace_results <- bind_rows(lapply(exposures, function(x) {
+
+  run_cluster_model(
+    data = spatial_data_proj |> filter(age_group == "younger"),
+    outcome = "ace_n",
+    exposure = x,
+    covariates = c("age_n", "sex"),
+    family = NULL,
+    exponentiate = FALSE,
+    outcome_label = "ACE (clustered)"
+  ) |>
+    mutate(exposure = x)
+}))
+```
+
+## Combine everything
+
+```{r}
+all_results <- bind_rows(
+  bin_results,
+  rudas_results,
+  ace_results
+) |>
+  mutate(
+    exposure = recode(exposure,
+                      exposure_pm25_z = "PM2.5",
+                      exposure_pm10_z = "PM10",
+                      exposure_temp_z = "Temperature",
+                      exposure_humidity_z = "Humidity")
+  )
+
+all_results <- all_results |>
+  mutate(
+    # reorder outcomes (facet order)
+    outcome = factor(outcome,
+                     levels = c("DC binary (clustered)",
+                                "ACE (clustered)",
+                                "RUDAS (clustered)")),
+
+    # reorder exposures (y-axis order)
+    exposure = factor(exposure,
+                      levels = c("Temperature",
+                                 "Humidity",
+                                 "PM2.5",
+                                 "PM10"))
+  )
+```
+
+## Forest Plot
+
+```{r}
+ggplot(all_results,
+       aes(x = estimate, y = exposure, color = exposure)) +
+
+  geom_vline(data = subset(all_results, outcome == "DC binary (clustered)"),
+             aes(xintercept = 1),
+             linetype = "dashed", color = "grey50") +
+
+  geom_vline(data = subset(all_results, outcome != "DC binary (clustered)"),
+             aes(xintercept = 0),
+             linetype = "dashed", color = "grey50") +
+
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
+                 height = 0.2) +
+
+  geom_point(size = 3) +
+
+  facet_wrap(~ outcome, scales = "free_x", ncol = 3) +
+
+  theme_minimal() +
+  theme(legend.position = "none") +
+
+  labs(
+  title = "Association between environmental exposures and cognitive outcomes",
+  subtitle = paste0(
+    "Adjusted for age and sex; exposures standardized (per 1 SD)\n",
+    "Binary outcome: odds ratios | Continuous outcomes: β coefficients\n",
+    "Cluster-robust SEs at sector × conglomerado level"
+  ),
+  x = "Effect estimate",
+  y = NULL
+)
+```
+
+## Sensor zone comparison table to show descriptively whether zones with higher PM2.5 tend to have worse cognitive scores
+
+\# No dose-response pattern is observed between PM2.5 and cognitive
+decline. Among the four sensors with adequate sample size (Ventanilla
+n=19 and Carab n=4 are too small), the highest-PM2.5 zone (Comas, 40.1
+µg/m³) has the lowest rate of cognitive decline (9.3%) and the highest
+RUDAS scores (11.3), while the lowest-PM2.5 zones cluster around 16%
+decline. This is an ecological confounding artifact: the bulk of
+participants are assigned to just two sensors — MiPeru (n=501) and
+PuenteP Estadio (n=361) — which cover most of the study area and show
+nearly identical PM2.5 values (\~32–34 µg/m³). There is effectively no
+meaningful exposure gradient across participants. The sensor zones are
+not exchangeable populations, and any apparent association between
+sensor-assigned PM2.5 and cognition reflects compositional differences
+between zones rather than a pollution effect. This demonstrates why
+naive ecological exposure assignment produces misleading results, and
+motivates future work using personal or indoor exposure monitoring.
+
+This table is a valuable finding — it demonstrates why naive ecological
+exposure assignment produces misleading results, and motivates future
+work with better exposure characterization; a methodological lesson
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(nearest_sensor_name) |>
+  summarise(
+    pm25          = mean(exposure_pm25, na.rm = TRUE),
+    pm10          = mean(exposure_pm10, na.rm = TRUE),
+    temp          = mean(exposure_temp, na.rm = TRUE),
+    hum          = mean(exposure_humidity, na.rm = TRUE),
+    pct_dc        = mean(dc_binary, na.rm = TRUE) * 100,
+    mean_rudas    = mean(rudas_n, na.rm = TRUE),
+    mean_ace      = mean(ace_n, na.rm = TRUE),
+    n             = n(),
+    .groups       = "drop"
+  ) |>
+  arrange(pm25)
+```
+
+## Add in SES level
+
+```{r}
+# SES-ADJUSTED MODELS (PARALLEL TO EXISTING PIPELINE)
+
+# --- 1. PM2.5 (SES-adjusted) ---
+pm25_ses <- glm(
+  dc_binary ~ exposure_pm25_z + age_n + sex + ses_level,
+  data = spatial_data_proj |> st_drop_geometry() |> filter(!is.na(dc_binary)),
+  family = binomial
+)
+
+pm25_ses_results <- tidy(pm25_ses, conf.int = TRUE, exponentiate = TRUE) |>
+  filter(term == "exposure_pm25_z") |>
+  mutate(
+    exposure = "PM2.5",
+    model = "SES-adjusted",
+    outcome = "DC binary"
+  )
+
+
+# --- 2. PM10 (SES-adjusted) ---
+pm10_ses <- glm(
+  dc_binary ~ exposure_pm10_z + age_n + sex + ses_level,
+  data = spatial_data_proj |> st_drop_geometry() |> filter(!is.na(dc_binary)),
+  family = binomial
+)
+
+pm10_ses_results <- tidy(pm10_ses, conf.int = TRUE, exponentiate = TRUE) |>
+  filter(term == "exposure_pm10_z") |>
+  mutate(
+    exposure = "PM10",
+    model = "SES-adjusted",
+    outcome = "DC binary"
+  )
+
+
+# --- 3. Temperature (SES-adjusted) ---
+temp_ses <- glm(
+  dc_binary ~ exposure_temp_z + age_n + sex + ses_level,
+  data = spatial_data_proj |> st_drop_geometry() |> filter(!is.na(dc_binary)),
+  family = binomial
+)
+
+temp_ses_results <- tidy(temp_ses, conf.int = TRUE, exponentiate = TRUE) |>
+  filter(term == "exposure_temp_z") |>
+  mutate(
+    exposure = "Temperature",
+    model = "SES-adjusted",
+    outcome = "DC binary"
+  )
+
+
+# --- 4. Humidity (SES-adjusted) ---
+hum_ses <- glm(
+  dc_binary ~ exposure_humidity_z + age_n + sex + ses_level,
+  data = spatial_data_proj |> st_drop_geometry() |> filter(!is.na(dc_binary)),
+  family = binomial
+)
+
+hum_ses_results <- tidy(hum_ses, conf.int = TRUE, exponentiate = TRUE) |>
+  filter(term == "exposure_humidity_z") |>
+  mutate(
+    exposure = "Humidity",
+    model = "SES-adjusted",
+    outcome = "DC binary"
+  )
+
+
+# COMBINE (SES VERSION ONLY — SAFE, SEPARATE OBJECT)
+
+all_results_ses <- bind_rows(
+  pm25_ses_results,
+  pm10_ses_results,
+  temp_ses_results,
+  hum_ses_results
+)
+```
+
+No statistically significant associations were observed between any
+sensor-assigned environmental exposure (PM2.5, PM10, temperature,
+humidity) and cognitive outcomes in adjusted models. Forest plot
+estimates for the binary cognitive decline outcome were: PM2.5 OR 0.91
+(95% CI 0.75–1.11, p=0.370), PM10 OR 0.90 (95% CI 0.74–1.11, p=0.333),
+temperature OR 1.08 (95% CI 0.90–1.30, p=0.406), humidity OR 1.07 (95%
+CI 0.90–1.27, p=0.469). Continuous outcome models for RUDAS and ACE were
+similarly null across all four exposure variables.
+
+## Highways
+
+The study area runs along what looks like a major highway corridor (the
+blue trunk road running north-south). Our participant points are
+clustered along and near this road. The red/pink dementia cases don't
+obviously cluster in one spot, but proximity to that trunk road varies
+meaningfully across participants — unlike the PM2.5 values which barely
+vary at all.
+
+```{r}
+highways <- st_read("/Users/gabriellebenoit/Documents/GitHub/peru_air/highways_export.gpkg")
+colnames(highways)
+table(highways$type)
+
+# Filter to major roads only
+major_roads <- highways |>
+  filter(highway %in% c("trunk", "primary", "secondary"))
+
+# Check how many features you kept
+nrow(major_roads)
+table(major_roads$highway)
+
+# Reproject to match spatial_data_proj
+major_roads_proj <- major_roads |> st_transform(32718)
+
+# Compute distance from each participant to nearest major road (meters)
+dist_matrix <- st_distance(spatial_data_proj |> st_transform(32718),
+                           major_roads_proj)
+
+spatial_data_proj <- spatial_data_proj |>
+  mutate(dist_to_road_m = apply(dist_matrix, 1, min) |> as.numeric())
+
+# Check distribution
+summary(spatial_data_proj$dist_to_road_m)
+
+```
+
+Meaningful continuous variation from 9 meters to 4.6 km. - Median 674m —
+half of the participants live within \~674m of a major road - Some very
+close (9m) — essentially on the road - Max 4.5km — good spread at the
+far end - Right-skewed (mean 1001 \>\> median 674m) — confirms the need
+to log-transform
+
+```{r}
+# Add log distance and standardized versions
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    log_dist_road  = log(dist_to_road_m + 1),
+    dist_road_z    = as.numeric(scale(dist_to_road_m)),
+    near_road_100m = dist_to_road_m <= 100,
+    near_road_500m = dist_to_road_m <= 500
+  )
+
+
+# --- Binary outcome: full sample ---
+road_binary_results <- run_cluster_model(
+  data = spatial_data_proj,
+  outcome = "dc_binary",
+  exposure = "log_dist_road",
+  covariates = c("age_n", "sex"),
+  family = binomial,
+  exponentiate = TRUE,
+  outcome_label = "DC binary (clustered)"
+)
+
+# --- RUDAS: older adults ---
+road_rudas_results <- run_cluster_model(
+  data = spatial_data_proj |> filter(age_group == "older"),
+  outcome = "rudas_n",
+  exposure = "log_dist_road",
+  covariates = c("age_n", "sex"),
+  family = NULL,
+  exponentiate = FALSE,
+  outcome_label = "RUDAS (clustered)"
+)
+
+# --- ACE: younger adults ---
+road_ace_results <- run_cluster_model(
+  data = spatial_data_proj |> filter(age_group == "younger"),
+  outcome = "ace_n",
+  exposure = "log_dist_road",
+  covariates = c("age_n", "sex"),
+  family = NULL,
+  exponentiate = FALSE,
+  outcome_label = "ACE (clustered)"
+)
+
+
+# --- Quick descriptive by buffer zone ---
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(near_road_500m) |>
+  summarise(
+    pct_dc     = mean(dc_binary, na.rm = TRUE) * 100,
+    mean_rudas = mean(rudas_n,   na.rm = TRUE),
+    mean_ace   = mean(ace_n,     na.rm = TRUE),
+    n          = n()
+  )
+```
+
+This is the most interesting result yet.
+
+Participants living within 500m of a major road have lower rates of
+cognitive decline (12.2% vs 16.4%) and higher cognitive scores (RUDAS
+8.29 vs 6.82, ACE 80.24 vs 78.1) — the opposite of what would be
+expected if road proximity were harmful. This mirrors the ecological
+confounding pattern seen with PM2.5: proximity to urban infrastructure
+in this peri-urban Lima context likely reflects better access to
+services, healthcare, and economic opportunity rather than greater
+pollution burden.
+
+In adjusted models, road proximity was not significantly associated with
+the binary cognitive decline outcome (OR 1.07, 95% CI 0.93-1.24, p=0.33)
+or with RUDAS scores in older adults (β -0.45, 95% CI -1.35-0.45,
+p=0.32). The only statistically significant finding was for ACE in
+younger adults: each unit increase in log-distance from a major road was
+associated with a 0.92-point decrease in ACE score (β -0.92, 95% CI
+-1.65 – -0.28, p=0.005). The direction of this effect – farther from
+roads associated with worse cognition – is counterintuitive from a
+pollution-harm perspective and instead consistent with urban access
+advantages accruing to those living closer to major road infrastructure.
+
+Why only younger adults? ACE has a higher ceiling and greater
+sensitivity than RUDAS, and younger adults (30–59) have more cognitive
+reserve and score variance — making subtle environmental gradients
+detectable where RUDAS in older adults cannot resolve them. Older
+adults' scores may already reflect age-related decline that obscures any
+road proximity signal.
+
+The direction of the ACE effect — farther from roads associates with
+worse cognition — points to urban access as the operative mechanism in
+this setting, not traffic-related pollution.
+
+## View results
+
+```{r}
+bind_rows(
+  road_binary_results,
+  road_rudas_results,
+  road_ace_results
+) |>
+  select(outcome, estimate, conf.low, conf.high, p.value) |>
+  mutate(across(where(is.numeric), ~ round(., 3)))
+```
+
+## Figure
+
+```{r}
+# Buffer comparison table
+buffer_summary <- spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(
+    buffer_zone = case_when(
+      dist_to_road_m <= 100  ~ "Within 100m",
+      dist_to_road_m <= 500  ~ "100–500m",
+      dist_to_road_m <= 1000 ~ "500m–1km",
+      TRUE                   ~ "Beyond 1km"
+    ),
+    buffer_zone = factor(buffer_zone, 
+                         levels = c("Within 100m", "100–500m", 
+                                    "500m–1km", "Beyond 1km"))
+  ) |>
+  group_by(buffer_zone) |>
+  summarise(
+    pct_dc     = mean(dc_binary,  na.rm = TRUE) * 100,
+    mean_rudas = mean(rudas_n,    na.rm = TRUE),
+    mean_ace   = mean(ace_n,      na.rm = TRUE),
+    n          = n(),
+    .groups    = "drop"
+  )
+
+print(buffer_summary)
+
+
+buffer_summary |>
+  pivot_longer(cols = c(pct_dc, mean_rudas, mean_ace),
+               names_to = "outcome", values_to = "value") |>
+  mutate(outcome = recode(outcome,
+    pct_dc     = "% cognitive decline",
+    mean_rudas = "mean RUDAS (out of 30)",
+    mean_ace   = "mean ACE (out of 100)"
+  ),
+  outcome = factor(outcome, levels = c(
+    "% cognitive decline", "mean RUDAS (out of 30)", "mean ACE (out of 100)"
+  ))) |>
+  ggplot(aes(x = buffer_zone, y = value, fill = buffer_zone)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = round(value, 1)),
+            vjust = -0.4, size = 3,
+            color = "grey30") +
+  facet_wrap(~ outcome, scales = "free_y") +
+  scale_fill_manual(values = c(
+    "Within 100m" = "#B5D4F4",
+    "100–500m"    = "#85B7EB",
+    "500m–1km"    = "#378ADD",
+    "Beyond 1km"  = "#185FA5"
+  )) +
+  labs(
+    title   = "Cognitive outcomes by distance to nearest major road",
+    caption = "Distance to nearest trunk, primary, or secondary road (OpenStreetMap). Unadjusted means.",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 8, angle = 20, hjust = 1),
+        strip.text  = element_text(size = 10))
+```
+
+## Add in SES level
+
+```{r}
+table(spatial_data_proj$ses_level, useNA = "always")
+
+# Does SES predict cognitive decline?
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(ses_level) |>
+  summarise(
+    pct_dc     = mean(dc_binary, na.rm = TRUE) * 100,
+    mean_rudas = mean(rudas_n,   na.rm = TRUE),
+    mean_ace   = mean(ace_n,     na.rm = TRUE),
+    n          = n()
+  ) |>
+  arrange(ses_level)
+
+# Is SES associated with exposure variables?
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(ses_level) |>
+  summarise(
+    mean_pm25      = mean(exposure_pm25,  na.rm = TRUE),
+    mean_dist_road = mean(dist_to_road_m, na.rm = TRUE),
+    n              = n()
+  ) |>
+  arrange(ses_level)
+
+```
+
+# Re-run models
+
+```{r}
+# --- Binary + SES ---
+road_binary_ses <- run_cluster_model(
+  data = spatial_data_proj,
+  outcome = "dc_binary",
+  exposure = "log_dist_road",
+  covariates = c("age_n", "sex", "ses_level"),
+  family = binomial,
+  exponentiate = TRUE,
+  outcome_label = "DC binary (SES, clustered)"
+)
+
+# --- RUDAS + SES ---
+road_rudas_ses <- run_cluster_model(
+  data = spatial_data_proj |> filter(age_group == "older"),
+  outcome = "rudas_n",
+  exposure = "log_dist_road",
+  covariates = c("age_n", "sex", "ses_level"),
+  outcome_label = "RUDAS (SES, clustered)"
+)
+
+# --- ACE + SES ---
+road_ace_ses <- run_cluster_model(
+  data = spatial_data_proj |> filter(age_group == "younger"),
+  outcome = "ace_n",
+  exposure = "log_dist_road",
+  covariates = c("age_n", "sex", "ses_level"),
+  outcome_label = "ACE (SES, clustered)"
+)
+
+
+
+
+
+
+# Comparison table: before vs after SES 
+bind_rows(
+  road_binary_results |> mutate(model = "without SES"),
+  road_binary_ses     |> mutate(model = "with SES"),
+  road_rudas_results  |> mutate(model = "without SES"),
+  road_rudas_ses      |> mutate(model = "with SES"),
+  road_ace_results    |> mutate(model = "without SES"),
+  road_ace_ses        |> mutate(model = "with SES")
+) |>
+  select(outcome, model, estimate, conf.low, conf.high, p.value) |>
+  mutate(across(where(is.numeric), ~ round(., 3)))
+```
+
+In adjusted models, road proximity is null for both the binary outcome
+(OR 1.07 without SES, OR 1.04 with SES, both p\>0.33) and RUDAS in older
+adults (β −0.45 without SES, β −0.30 with SES, both p\>0.30). SES does
+not meaningfully change either null result.
+
+For ACE in younger adults, the road proximity effect attenuates modestly
+after SES adjustment (β −0.92 without SES vs β −0.78 with SES) but
+remains statistically significant (p=0.013). SES accounts for roughly
+15% of the original effect estimate — consistent with the descriptive
+finding that lower-SES participants tend to live slightly farther from
+major roads — but does not explain it away. The association remains
+statistically significant after SES adjustment (β −0.785, 95% CI −1.40–
+−0.17, p=0.013). The association between greater distance from major
+roads and lower ACE scores in 30–59 year olds is robust to socioeconomic
+adjustment.
+
+This pattern suggests the road proximity effect in younger adults is not
+simply a proxy for SES, though both urbanization and socioeconomic
+resources likely operate through related pathways — access to
+healthcare, education, and economic opportunity — in this peri-urban
+Lima context.
+
+## The *storyline* for the chapter:
+
+1.  PM2.5 — null, insufficient spatial variability. Only 6 sensors cover
+    the study area; most participants are assigned to just two, with a
+    PM2.5 range of roughly 32–40 µg/m³ across all zones. There is no
+    dose-response relationship. The apparent inverse pattern
+    (highest-PM2.5 zone has best cognition) is an ecological confounding
+    artifact reflecting population heterogeneity across sensor zones,
+    not a protective effect of pollution.
+
+2.  Distance to road — significant for ACE in younger adults, robust to
+    SES adjustment. The β attenuates from −0.92 to −0.78 after
+    controlling for SES level, but remains significant (p=0.013). SES is
+    a strong independent predictor of cognition across all outcomes, but
+    explains only \~15% of the road proximity effect, indicating the two
+    operate through partially overlapping but distinct pathways.
+
+3.  Consistent interpretation across both exposures — urbanization as
+    confounder. Both findings tell the same story: in peri-urban Lima,
+    living closer to roads and higher-pollution urban centers correlates
+    with better, not worse, cognitive outcomes. Structural access — to
+    healthcare, education, economic resources — likely dominates any
+    pollution effect at the exposure levels and spatial resolution
+    available in this study.
+
+4.  Methodological implication. Future studies in similar peri-urban
+    settings require personal or residential-level exposure monitors,
+    fine-grained SES adjustment, and larger sensor networks to
+    disentangle pollution effects from the urbanization gradient. The
+    current findings are best framed as a demonstration of ecological
+    confounding and the limits of sensor-assigned exposure, rather than
+    evidence of null pollution effects per se.
+
+*Implication — future studies need personal, granular exposure
+monitors + SES adjustment to disentangle pollution from access; indoor
+air monitoring*
+
+```{r}
+summary_table <- spatial_data_proj %>%
+  group_by(nearest_sensor_name) %>%
+  summarise(
+    PM2.5      = mean(exposure_pm25, na.rm = TRUE),
+    `%DC`      = mean(dc_binary, na.rm = TRUE) * 100,
+    Mean_RUDAS = mean(rudas[!is.na(rudas) & rudas != 0]),
+    SD_RUDAS   = sd(rudas[!is.na(rudas) & rudas != 0]),
+    Mean_ACE   = mean(ace_score[!is.na(ace_score) & ace_score != 0]),
+    SD_ACE     = sd(ace_score[!is.na(ace_score) & ace_score != 0]),
+    n          = n(),
+    .groups = "drop"
+  )
+```
+
+## Summary table of exposure variables
+
+```{r}
+spatial_data_proj %>%
+  summarise(
+    Mean_ACE         = mean(ace_score[!is.na(ace_score) & ace_score != 0], na.rm = TRUE),
+    SD_ACE           = sd(ace_score[!is.na(ace_score) & ace_score != 0], na.rm = TRUE),
+    n_ACE            = sum(!is.na(ace_score) & ace_score != 0),
+
+    Mean_RUDAS       = mean(rudas[!is.na(rudas) & rudas != 0], na.rm = TRUE),
+    SD_RUDAS         = sd(rudas[!is.na(rudas) & rudas != 0], na.rm = TRUE),
+    n_RUDAS          = sum(!is.na(rudas) & rudas != 0),
+
+    Mean_Humidity    = mean(exposure_humidity, na.rm = TRUE),
+    SD_Humidity      = sd(exposure_humidity, na.rm = TRUE),
+    n_Humidity       = sum(!is.na(exposure_humidity)),
+
+    Mean_Temp        = mean(exposure_temp, na.rm = TRUE),
+    SD_Temp          = sd(exposure_temp, na.rm = TRUE),
+    n_Temp           = sum(!is.na(exposure_temp)),
+
+    Mean_PM25        = mean(exposure_pm25, na.rm = TRUE),
+    SD_PM25          = sd(exposure_pm25, na.rm = TRUE),
+    n_PM25           = sum(!is.na(exposure_pm25)),
+
+    Mean_PM10        = mean(exposure_pm10, na.rm = TRUE),
+    SD_PM10          = sd(exposure_pm10, na.rm = TRUE),
+    n_PM10           = sum(!is.na(exposure_pm10))
+  )
+```
+
+## Summary tables by sensor
+
+```{r}
+# define variable groups
+continuous_vars <- c("age", "bmi")
+categorical_vars <- c(
+  "sex", "education_cat", "civil_stat_cat",
+  "htn_cat", "native_lang", "health_ins_cat",
+  "occupation_cat", "chronic_dis"
+)
+
+# ---- continuous summaries ----
+cont_summary <- spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(nearest_sensor_name) |>
+  summarise(
+    across(all_of(continuous_vars),
+           ~ mean(.x, na.rm = TRUE),
+           .names = "mean_{.col}"),
+    n = n(),
+    .groups = "drop"
+  )
+
+# ---- categorical summaries (percent breakdowns) ----
+cat_summary <- spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(nearest_sensor_name) |>
+  select(nearest_sensor_name, all_of(categorical_vars)) |>
+  pivot_longer(-nearest_sensor_name,
+               names_to = "variable",
+               values_to = "value") |>
+  group_by(nearest_sensor_name, variable, value) |>
+  summarise(n = n(), .groups = "drop_last") |>
+  mutate(pct = 100 * n / sum(n)) |>
+  ungroup()
+
+# ---- optional: wide format for categorical ----
+cat_summary_wide <- cat_summary |>
+  unite(var_level, variable, value, sep = "_") |>
+  pivot_wider(names_from = var_level, values_from = pct)
+
+# ---- combine everything ----
+final_summary <- cont_summary |>
+  left_join(cat_summary_wide, by = "nearest_sensor_name") |>
+  arrange(nearest_sensor_name)
+
+
+
+# prettier
+# Assign table to an object
+my_table <- spatial_data_proj |>
+  st_drop_geometry() |>
+  select(
+    nearest_sensor_name, age, sex, ace_score, rudas, education_cat, civil_stat_cat,
+    bmi, htn_cat, native_lang, health_ins_cat, occupation_cat, chronic_dis
+  ) |>
+  tbl_summary(
+    by = nearest_sensor_name,
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = all_continuous() ~ 1,
+    missing = "ifany"
+  ) |>
+  add_n() |>
+  add_p(
+    # Fix for FEXACT errors: simulate p-values for Fisher's tests
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE)
+  ) |>
+  bold_labels() |>
+  bold_p()
+
+
+# Export to Excel
+gtsummary::as_hux_xlsx(my_table, file = "descriptives_by_sensor_table.xlsx")
+
+
+
+```
+
+## CURRENTLY NOT INCLUDING THIS IN THE MANUSCRIPT !!!!!
+
+## Change exposure gradient
+
+\# clean exposure variable
+
+```{r}
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    log_dist_road = log(dist_to_road_m + 1),
+    
+    road_exposure = case_when(
+      dist_to_road_m <= 100 ~ "≤100m",
+      dist_to_road_m <= 500 ~ "100–500m",
+      TRUE ~ ">500m"
+    ),
+    
+    road_exposure = factor(
+      road_exposure,
+      levels = c("≤100m", "100–500m", ">500m")
+    )
+  )
+
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    road_exposure = relevel(factor(road_exposure), ref = ">500m")
+  )
+
+```
+
+\# primary model (continuous exposure)
+
+```{r}
+model_continuous <- glm(
+  dc_binary ~ log_dist_road + age_n + sex,
+  data = spatial_data_proj,
+  family = binomial
+)
+
+continuous_results <- tidy(model_continuous, exponentiate = TRUE, conf.int = TRUE)
+
+continuous_results
+```
+
+\# sensitivity model (buffer categories)
+
+```{r}
+
+
+model_buffer <- glm(
+  dc_binary ~ road_exposure + age_n + sex,
+  data = spatial_data_proj,
+  family = binomial
+)
+
+buffer_results <- tidy(model_buffer, exponentiate = TRUE, conf.int = TRUE)
+
+buffer_results
+
+
+
+```
+
+\# cleaned combined output
+
+```{r}
+bind_rows(
+  continuous_results |> mutate(model = "Continuous (log distance)"),
+  buffer_results |> mutate(model = "Buffer zones")
+) |>
+  select(model, term, estimate, conf.low, conf.high, p.value)
+
+
+
+bind_rows(
+  continuous_results |> mutate(model = "Continuous"),
+  buffer_results |> mutate(model = "Buffer zones")
+) |>
+  mutate(across(c(estimate, conf.low, conf.high), ~round(.x, 3))) |>
+  select(model, term, estimate, conf.low, conf.high, p.value)
+```
+
+\# predicted probability plot
+
+```{r}
+newdat <- expand.grid(
+  log_dist_road = seq(
+    min(spatial_data_proj$log_dist_road, na.rm = TRUE),
+    max(spatial_data_proj$log_dist_road, na.rm = TRUE),
+    length.out = 100
+  ),
+  age_n = mean(spatial_data_proj$age_n, na.rm = TRUE),
+  sex = unique(spatial_data_proj$sex)[1]
+)
+
+newdat$pred <- predict(
+  model_continuous,
+  newdata = newdat,
+  type = "response"
+)
+
+ggplot(newdat, aes(x = log_dist_road, y = pred)) +
+  geom_line() +
+  labs(
+    title = "Predicted Probability of Cognitive Impairment by Road Proximity",
+    x = "Log Distance to Road (meters)",
+    y = "Predicted Probability"
+  ) +
+  theme_minimal()
+```
+
+\# simple buffer comparison
+
+```{r}
+ggplot(spatial_data_proj, aes(x = road_exposure, y = dc_binary)) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  stat_summary(fun = mean, geom = "line", aes(group = 1)) +
+  labs(
+    title = "Cognitive Impairment by Road Proximity",
+    x = "Distance to Road",
+    y = "Mean Probability of Cognitive Impairment"
+  ) +
+  theme_minimal()
+```
+
+## Re-run models for each road type
+
+```{r}
+# --- Compute distance to each road type separately ---
+for (road_type in c("trunk", "primary", "secondary")) {
+  roads_subset <- major_roads |> filter(highway == road_type)
+  dist_mat <- st_distance(spatial_data_proj |> st_transform(32718), roads_subset)
+  spatial_data_proj <- spatial_data_proj |>
+    mutate(!!paste0("dist_", road_type, "_m") := apply(dist_mat, 1, min) |> as.numeric())
+}
+
+# Log-transform each
+spatial_data_proj <- spatial_data_proj |>
+  mutate(
+    log_dist_trunk     = log(dist_trunk_m     + 1),
+    log_dist_primary   = log(dist_primary_m   + 1),
+    log_dist_secondary = log(dist_secondary_m + 1)
+  )
+
+# --- Run models for each road type x outcome ---
+road_sensitivity <- bind_rows(
+  lapply(c("trunk", "primary", "secondary"), function(rt) {
+    exp_var <- paste0("log_dist_", rt)
+    bind_rows(
+      run_cluster_model(
+        data = spatial_data_proj,
+        outcome = "dc_binary", exposure = exp_var,
+        covariates = c("age_n", "sex", "ses_level"),
+        family = binomial, exponentiate = TRUE,
+        outcome_label = paste0("DC binary — ", rt)
+      ),
+      run_cluster_model(
+        data = spatial_data_proj |> filter(age_group == "older"),
+        outcome = "rudas_n", exposure = exp_var,
+        covariates = c("age_n", "sex", "ses_level"),
+        outcome_label = paste0("RUDAS — ", rt)
+      ),
+      run_cluster_model(
+        data = spatial_data_proj |> filter(age_group == "younger"),
+        outcome = "ace_n", exposure = exp_var,
+        covariates = c("age_n", "sex", "ses_level"),
+        outcome_label = paste0("ACE — ", rt)
+      )
+    )
+  })
+)
+
+# --- View comparison table ---
+road_sensitivity |>
+  select(outcome, estimate, conf.low, conf.high, p.value) |>
+  mutate(across(where(is.numeric), ~ round(., 3)))
+```
+
+In road-type stratified sensitivity analyses, the inverse association
+between road proximity and ACE scores in younger adults was consistent
+for trunk (β −0.87, p=0.048) and secondary roads (β −0.83, p=0.007),
+suggesting the pooled result is not attributable to any single road
+classification. The primary road estimate was in the opposite direction
+but did not reach statistical significance (β +1.15, p=0.081), possibly
+reflecting the distinct spatial distribution of primary roads in this
+peri-urban context.
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(nearest_sensor_name) |>
+  summarise(
+    n                    = n(),
+    mean_dist_any        = mean(dist_to_road_m,     na.rm = TRUE),
+    mean_dist_trunk      = mean(dist_trunk_m,       na.rm = TRUE),
+    mean_dist_primary    = mean(dist_primary_m,     na.rm = TRUE),
+    mean_dist_secondary  = mean(dist_secondary_m,   na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(across(starts_with("mean_dist"), ~ round(., 0))) |>
+  arrange(mean_dist_any)
+```
+
+## More descriptive statisitcs [yes, including in manuscript]
+
+For continuous covariates by sensor i.e. age, BMI
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(nearest_sensor_name) |>
+  summarise(
+    n = n(),
+    age_mean = mean(age, na.rm = TRUE),
+    age_sd = sd(age, na.rm = TRUE),
+    bmi_mean = mean(bmi, na.rm = TRUE),
+    bmi_sd = sd(bmi, na.rm = TRUE)
+  )
+```
+
+\# Categorical covariates by sensor (i.e., sex, education, insurance)
+
+```{r}
+# sex
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_name, sex) |>
+  group_by(nearest_sensor_name) |>
+  mutate(percent = n / sum(n) * 100)
+
+# education_cat
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_name, education_cat) |>
+  group_by(nearest_sensor_name) |>
+  mutate(percent = n / sum(n) * 100)
+```
+
+\# Checking multiple variables \>\> stacked descriptive dataset
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  select(nearest_sensor_name,
+         sex, education_cat, civil_stat_cat,
+         occupation_cat, health_ins_cat,
+         htn_cat, chronic_dis, native_lang,
+         ses_level) |>
+  pivot_longer(-nearest_sensor_name,
+               names_to = "variable",
+               values_to = "value") |>
+  count(nearest_sensor_name, variable, value) |>
+  group_by(nearest_sensor_name, variable) |>
+  mutate(percent = n / sum(n) * 100)
+```
+
+\# Cleaner formatting
+
+```{r}
+library(gtsummary)
+spatial_data_proj |>
+  st_drop_geometry() |>
+  select(
+    nearest_sensor_name,
+    age, sex, education_cat, civil_stat_cat,
+    bmi, htn_cat, native_lang,
+    health_ins_cat, occupation_cat,
+    chronic_dis, ses_level
+  ) |>
+  tbl_summary(by = nearest_sensor_name)
+```
+
+\# Quick diagnostic visualization Super important: my exposure
+assignment is sensor-based, so if covariates cluster by sensor, it
+suggests potential spatial confounding (e.g., SES or age differences by
+neighborhood).
+
+However, this quick visual does not suggest spatial confounding by age.
+Medians are fairly similar (\~45-55 years). Interquartile ranges overlap
+a lot. Some sensors do have longer upper tails. -
+GEOHealth_Carab_VictorRaulHT → slightly older median (\~52–53) -
+GEOHealth_Ventanilla_NSBelen → slightly younger (\~45–47)
+
+-   A few sensors (e.g., PuenteP_Estadio_1, MiPeru_Chavinillo) extend to
+    \~90+. a few older participants near those sensors, but since the
+    median and IQR are similar, this is unlikely to drive systematic
+    confounding.
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  ggplot(aes(nearest_sensor_name, age)) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_name, ses_quint) |>
+  group_by(nearest_sensor_name) |>
+  mutate(p = n / sum(n))
+
+spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_name, ses_level) |>
+  group_by(nearest_sensor_name) |>
+  mutate(prop = n / sum(n)) |>
+  ggplot(aes(x = nearest_sensor_name, y = prop, fill = factor(ses_level))) +
+  geom_col() +
+  coord_flip() +
+  scale_x_discrete(labels = c(
+    "GEOHealth_Ventanilla_NSBelen" = "Ventanilla",
+    "GEOHealth_SanMa_IE005" = "SanMa",
+    "GEOHealth_PuenteP_Estadio_1" = "PuenteP Estadio",
+    "GEOHealth_MiPeru_Chavinillo" = "MiPeru",
+    "GeoHealth_Comas_2055PAbril" = "Comas",
+    "GEOHealth_Carab_VictorRaulHT" = "Carab"
+  )) +
+  labs(
+    x = "Sensor",
+    y = "Proportion",
+    fill = "SES Level",
+    title = "Socioeconomic Status Distribution by Nearest Sensor"
+  ) +
+  theme_minimal()
+```
+
+## Chi-Square / Kruskal-Wallis Tests by Sector
+
+```{r}
+# 1. Categorical variables → Chi-square
+cat_vars <- c("sex", "education_cat", "civil_stat_cat", "native_lang",
+              "health_ins_cat", "occupation_cat", "chronic_dis",
+              "htn_cat", "ses_level")
+
+chi_results <- map_dfr(cat_vars, function(var) {
+  tbl <- table(spatial_data_proj[[var]], spatial_data_proj$nearest_sensor_name, useNA = "no")
+  test <- chisq.test(tbl, simulate.p.value = TRUE, B = 2000)
+  tibble(
+    variable  = var,
+    chi_sq    = round(test$statistic, 2),
+    df        = test$parameter,
+    p_value   = round(test$p.value, 4),
+    sig       = case_when(p_value < 0.001 ~ "***",
+                          p_value < 0.01  ~ "**",
+                          p_value < 0.05  ~ "*",
+                          TRUE            ~ "")
+  )
+})
+
+# 2. Continuous variables → Kruskal-Wallis (non-parametric; safer for skewed data)
+cont_vars <- c("age", "bmi", "rudas", "ace_score", "exposure_pm25", "exposure_pm10", "exposure_temp", "exposure_humidity")
+
+kw_results <- map_dfr(cont_vars, function(var) {
+  test <- kruskal.test(spatial_data_proj[[var]] ~ spatial_data_proj$nearest_sensor_name)
+  tibble(
+    variable = var,
+    chi_sq   = round(test$statistic, 2),
+    df       = test$parameter,
+    p_value  = round(test$p.value, 4),
+    sig      = case_when(p_value < 0.001 ~ "***",
+                         p_value < 0.01  ~ "**",
+                         p_value < 0.05  ~ "*",
+                         TRUE            ~ "")
+  )
+})
+
+# 3. Combine and display
+balance_tests <- bind_rows(
+  chi_results %>% mutate(test = "Chi-square"),
+  kw_results  %>% mutate(test = "Kruskal-Wallis")
+) %>% select(variable, test, chi_sq, df, p_value, sig)
+
+knitr::kable(balance_tests, caption = "Covariate balance across sensor zones")
+```
+
+No covariate differs significantly across sensor zones (all p \> 0.05).
+This means sensor-zone exposure assignment is not systematically
+confounded by who lives where — age, SES, education, civil status, etc.
+are distributed comparably across zones, strengthening our argument.
+
+the NA in the df column for chi-square is expected; it happens because
+we used simulate.p.value = TRUE, which runs a Monte Carlo permutation
+test instead of the standard asymptotic chi-square. The simulated
+version doesn't return degrees of freedom. Potential footnote: p-values
+estimated via Monte Carlo simulation (B = 2000) due to small expected
+cell counts in some zones.
+
+Add to manuscript: To assess potential spatial confounding, we tested
+whether key sociodemographic and health covariates differed across
+sensor zones using chi-square tests (categorical variables) and
+Kruskal-Wallis tests (continuous variables). No significant differences
+were observed (all p \> 0.05; Supplementary Table X), suggesting that
+exposure assignment was not systematically associated with participant
+characteristics.
+
+New figure with error bars for: Distribution of Dementia Status by SES
+Level
+
+```{r}
+prop_data <- spatial_data_proj %>%
+  count(any_relevant_dem, ses_level) %>%
+  group_by(any_relevant_dem) %>%
+  mutate(total = sum(n), prop = n / total) %>%
+  rowwise() %>%
+  mutate(
+    lower = binom.test(n, total)$conf.int[1],
+    upper = binom.test(n, total)$conf.int[2]
+  ) %>%
+  ungroup() %>%
+mutate(
+  any_relevant_dem = dplyr::case_match(any_relevant_dem,
+    "Sin DC severo" ~ "Cognitively Unimpaired",
+    "DC severo con compromiso funcional" ~ "Cognitive Impairment with Functional Impairment",
+    "DC severo sin compromiso funcional" ~ "Cognitive Impairment without Functional Impairment"
+  ),
+  ses_level = dplyr::case_match(ses_level,
+    "NSE A" ~ "A (Highest)",
+    "NSE B" ~ "B",
+    "NSE C" ~ "C",
+    "NSE D" ~ "D",
+    "NSE E" ~ "E (Lowest)"
+  ),
+  ses_level = forcats::fct_relevel(ses_level, "A (Highest)", "B", "C", "D", "E (Lowest)")
+  ) %>%
+  drop_na(ses_level)
+
+ggplot(prop_data, aes(x = prop, y = ses_level, color = ses_level)) +
+  geom_pointrange(aes(xmin = lower, xmax = upper), linewidth = 0.8, size = 0.7) +
+  facet_wrap(~ any_relevant_dem, ncol = 1,          # strips on TOP now
+             labeller = label_wrap_gen(width = 35)) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1),
+                     breaks = c(0, 0.25, 0.5, 0.75, 1)) +
+  labs(
+    title   = "Proportion by SES Level across Dementia Status",
+    x       = "Proportion (95% CI)",
+    y       = NULL,
+    caption = "Error bars: 95% exact binomial confidence intervals"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position   = "none",
+    strip.text        = element_text(face = "bold", size = 11, hjust = 0),  # left-aligned strip titles
+    strip.background  = element_rect(fill = "grey94", color = NA),          # subtle background box
+    panel.spacing     = unit(1.2, "lines"),
+    panel.grid.minor  = element_blank(),
+    panel.grid.major.y = element_blank(),   # remove horizontal gridlines — cleaner for dot plots
+    axis.text.y       = element_text(size = 10)
+  )
+```
+
+```{r}
+prop_data <- spatial_data_proj %>%
+  count(any_relevant_dem, ses_level) %>%
+  group_by(any_relevant_dem) %>%
+  mutate(total = sum(n), prop = n / total) %>%
+  rowwise() %>%
+  mutate(
+    lower = binom.test(n, total)$conf.int[1],
+    upper = binom.test(n, total)$conf.int[2]
+  ) %>%
+  ungroup() %>%
+  mutate(
+    any_relevant_dem = recode(any_relevant_dem,
+      "Sin DC severo"                          = "Cognitively Unimpaired",
+      "DC severo con compromiso funcional"     = "Cognitive Impairment with Functional Impairment",
+      "DC severo sin compromiso funcional"     = "Cognitive Impairment without Functional Impairment"
+    ),
+    ses_level = recode(ses_level,
+      "NSE A" = "A (Highest)",
+      "NSE B" = "B",
+      "NSE C" = "C",
+      "NSE D" = "D",
+      "NSE E" = "E (Lowest)"
+    ),
+    ses_level = fct_relevel(ses_level, "A (Highest)", "B", "C", "D", "E (Lowest)")
+  ) %>%
+  drop_na(ses_level)
+
+ggplot(prop_data, aes(x = any_relevant_dem, y = prop, fill = ses_level)) +
+  geom_col(width = 0.6) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2, linewidth = 0.7, color = "gray30") +
+  facet_wrap(~ ses_level, nrow = 1) +
+  scale_x_discrete(labels = \(x) str_wrap(x, width = 15)) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    title   = "Proportion by Dementia Status, Faceted by SES Level",
+    x       = NULL,
+    y       = "Proportion (95% CI)",
+    caption = "Error bars: 95% exact binomial confidence intervals"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position   = "none",
+    strip.text        = element_text(face = "bold", size = 11),
+    panel.spacing     = unit(1.5, "lines"),
+    panel.grid.minor  = element_blank(),
+    axis.text.x       = element_text(size = 9, lineheight = 0.9),
+    plot.margin       = margin(b = 20, t = 10, l = 10, r = 10)
+  )
+```
+
+```{r}
+decline_by_ses <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  mutate(
+    decline = any_relevant_dem != "Sin DC severo"  # or define your preferred cutoff
+  ) %>%
+  group_by(ses_level) %>%
+  summarise(
+    n = n(),
+    n_decline = sum(decline, na.rm = TRUE),
+    prev_decline = n_decline / n
+  ) %>%
+  ungroup()
+
+## add confidence intervals
+decline_by_ses <- decline_by_ses %>%
+  mutate(
+    lower = purrr::map2_dbl(n_decline, n, ~ binom.test(.x, .y)$conf.int[1]),
+    upper = purrr::map2_dbl(n_decline, n, ~ binom.test(.x, .y)$conf.int[2])
+  )
+
+## decline range
+decline_range <- decline_by_ses %>%
+  summarise(
+    min_prev = min(prev_decline, na.rm = TRUE),
+    max_prev = max(prev_decline, na.rm = TRUE)
+  )
+
+## Mean ACE score by SES
+ace_by_ses <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  group_by(ses_level) %>%
+  summarise(
+    mean_ace = mean(ace_score, na.rm = TRUE),
+    sd_ace = sd(ace_score, na.rm = TRUE),
+    n = n()
+  ) %>%
+  ungroup()
+
+## Get the difference across SES levels
+ace_range <- ace_by_ses %>%
+  summarise(
+    min_ace = min(mean_ace, na.rm = TRUE),
+    max_ace = max(mean_ace, na.rm = TRUE),
+    diff_ace = max_ace - min_ace
+  )
+
+summary_ace_table <- decline_by_ses %>%
+  left_join(ace_by_ses, by = "ses_level")
+
+
+
+
+## Mean rudas score by SES
+rudas_by_ses <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  group_by(ses_level) %>%
+  summarise(
+    mean_rudas = mean(rudas_n, na.rm = TRUE),
+    sd_rudas = sd(rudas_n, na.rm = TRUE),
+    n = n()
+  ) %>%
+  ungroup()
+
+## Get the difference across SES levels
+rudas_range <- rudas_by_ses %>%
+  summarise(
+    min_rudas = min(mean_rudas, na.rm = TRUE),
+    max_rudas = max(mean_rudas, na.rm = TRUE),
+    diff_rudas = max_rudas - min_rudas
+  )
+
+summary_rudas_table <- decline_by_ses %>%
+  left_join(rudas_by_ses, by = "ses_level")
+
+```
+
+## Map figure
+
+```{r}
+library(tmap)
+
+# Summarise mean PM2.5 per sensor, keeping sensor geometry
+sensor_summary <- spatial_data_proj |>
+  group_by(nearest_sensor_id) |>
+  summarise(
+    mean_pm25 = mean(exposure_pm25, na.rm = TRUE),
+    n = n(),
+    geometry = st_union(geometry) |> st_centroid()  # just takes a representative point
+  ) |>
+  st_as_sf(crs = 32718)
+
+# If you have a separate sensors sf object with one row per sensor, even better:
+# sensor_summary <- sensors_sf |> left_join(...)
+
+# Map
+tm_shape(spatial_data_proj |> st_transform(4326)) +
+  tm_dots(col = "grey80", size = 0.05, alpha = 0.5) +
+tm_shape(sensor_summary |> st_transform(4326)) +
+  tm_bubbles(
+    size = "n",
+    col = "mean_pm25",
+    palette = "YlOrRd",
+    title.col = "Mean PM2.5 (µg/m³)",
+    title.size = "N participants",
+    scale = 1.5
+  ) +
+  tm_text("nearest_sensor_id", size = 0.6, ymod = 0.8) +
+  tm_layout(
+    title = "Mean PM2.5 by sensor location",
+    legend.outside = TRUE
+  )
+
+```
+
+## Does SES predict road proximity?
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  group_by(ses_level) |>
+  summarise(
+    mean_dist_road = mean(dist_to_road_m, na.rm = TRUE),
+    median_dist_road = median(dist_to_road_m, na.rm = TRUE),
+    n = n()
+  ) |>
+  arrange(ses_level)
+
+```
+
+## Is the SES-road relationship statistically significant?
+
+```{r}
+summary(lm(dist_to_road_m ~ ses_level, data = spatial_data_proj |> st_drop_geometry()))
+```
+
+## Does SES vary within road distance buffers?
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(buffer_zone = case_when(
+    dist_to_road_m <= 100  ~ "Within 100m",
+    dist_to_road_m <= 500  ~ "100–500m",
+    dist_to_road_m <= 1000 ~ "500m–1km",
+    TRUE                   ~ "Beyond 1km"
+  )) |>
+  group_by(buffer_zone, ses_level) |>
+  summarise(n = n(), .groups = "drop") |>
+  pivot_wider(names_from = ses_level, values_from = n, values_fill = 0)
+```
+
+## Colinearity with temp, humidity, pm 2.5, pm 10
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  select(exposure_pm25, exposure_pm10, exposure_temp, exposure_humidity) |>
+  cor(use = "complete.obs") |>
+  round(2)
+
+vif_model <- lm(
+  ace_n ~ exposure_pm25_z + exposure_pm10_z + exposure_temp_z + exposure_humidity_z + age_n + sex,
+  data = spatial_data_proj |> st_drop_geometry() |> filter(age_group == "younger")
+)
+
+vif(vif_model)
+```
+
+## Correlations?
+
+```{r}
+
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(
+    ses_numeric        = as.numeric(ses_level),  # already ordered factor, this works
+    sex_numeric        = ifelse(sex == "Femenino", 1, 0),
+    chronic_dis_numeric = ifelse(chronic_dis == "Sí", 1, 0),
+    education_numeric  = as.numeric(education_cat),
+    health_ins_numeric = as.numeric(health_ins_cat),
+    occupation_numeric = as.numeric(occupation_cat)
+  ) |>
+  select(dist_to_road_m, ses_numeric, age_n, sex_numeric,
+         dc_binary, rudas_n, ace_n,
+         education_numeric, health_ins_numeric, occupation_numeric,
+         chronic_dis_numeric, bmi) |>
+  cor(use = "complete.obs", method = "spearman") |>
+  round(2)
+
+```
+
+## Interaction Term
+
+```{r}
+library(sandwich)
+library(lmtest)
+
+# Build model data
+int_data <- spatial_data_proj |>
+  st_drop_geometry() |>
+  filter(age_group == "younger") |>
+  select(ace_n, log_dist_road, ses_level, age_n, sex, cluster_id) |>
+  na.omit()
+
+# Fit interaction model
+int_model <- lm(
+  ace_n ~ log_dist_road * ses_level + age_n + sex,
+  data = int_data
+)
+
+# Cluster-robust SEs
+vcov_cl <- sandwich::vcovCL(int_model, cluster = int_data$cluster_id)
+lmtest::coeftest(int_model, vcov = vcov_cl) |> round(3)
+```
+
+## figure for interaction
+```{r}
+
+pred <- ggpredict(int_model, terms = c("log_dist_road", "ses_level"))
+
+ggplot(pred, aes(x = x, y = predicted, color = group)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.2, color = NA) +
+  labs(
+    title = "Interaction Between Socioeconomic Status and 
+    Roadway Distance in Predicting ACE Scores",
+    x = "Distance to road (logged)",
+    y = "ACE",
+    color = "SES level",
+    fill = "SES level"
+  ) +
+  theme_minimal()
+
+```
+
+
+## Re-structuring results to be organized
+
+-   Basic statistics
+-   Unadjusted models
+-   Adjusted models
+
+Check missingness:
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  select(dc_binary, rudas_n, ace_n,
+         age_n, sex, ses_level, bmi,
+         education_cat, civil_stat_cat, occupation_cat,
+         htn_cat, glucose_lev, chronic_dis) |>
+  summarise(across(everything(), ~ sum(is.na(.)) / n() * 100)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "pct_missing") |>
+  mutate(pct_missing = round(pct_missing, 1)) |>
+  arrange(desc(pct_missing))
+```
+
+The missingness is mostly expected and minor:
+
+-   rudas_n (69.2%) and ace_n (29.4%) — not real missingness, just
+    age-group specific instruments. Expected.
+-   glucose_lev (2.6%) — fine to include
+-   Everything else \<1% — no concerns
+
+```{r}
+# ============================================================
+# MODELING FRAMEWORK
+# ============================================================
+
+# --- Exposure list ---
+exposures_raw <- c("exposure_pm25", "exposure_pm10", 
+                   "exposure_temp", "exposure_humidity")
+
+# Adjusted covariate sets
+covs_basic <- c("age_n", "sex")
+covs_full  <- c("age_n", "sex", "ses_level", "bmi",
+                "education_cat", "civil_stat_cat", "occupation_cat",
+                "htn_cat", "glucose_lev", "chronic_dis")
+
+# ============================================================
+# STAGE 1: UNADJUSTED MODELS (crude, no covariates)
+# ============================================================
+
+run_crude_model <- function(data, outcome, exposure,
+                            family = NULL,
+                            exponentiate = FALSE,
+                            outcome_label = "outcome") {
+  model_data <- data |>
+    st_drop_geometry() |>
+    select(all_of(c(outcome, exposure, "cluster_id"))) |>
+    na.omit()
+
+  fml <- as.formula(paste(outcome, "~", exposure))
+
+  if (is.null(family)) {
+    model <- lm(fml, data = model_data)
+  } else {
+    model <- glm(fml, data = model_data, family = family)
+  }
+
+  vcov_cl <- sandwich::vcovCL(model, cluster = model_data$cluster_id)
+  ct <- lmtest::coeftest(model, vcov = vcov_cl)
+
+  ct_df <- as.data.frame(unclass(ct))
+  ct_df$term <- rownames(ct_df)
+  rownames(ct_df) <- NULL
+  colnames(ct_df)[1:4] <- c("estimate", "std.error", "statistic", "p.value")
+
+  ct_df <- ct_df |>
+    filter(term == exposure) |>
+    mutate(
+      conf.low  = estimate - 1.96 * std.error,
+      conf.high = estimate + 1.96 * std.error
+    )
+
+  if (!is.null(family) && exponentiate) {
+    ct_df <- ct_df |>
+      mutate(
+        estimate  = exp(estimate),
+        conf.low  = exp(conf.low),
+        conf.high = exp(conf.high)
+      )
+  }
+
+  ct_df |> mutate(exposure = exposure, outcome = outcome_label,
+                  model = "Unadjusted")
+}
+
+# Binary — unadjusted
+unadj_binary <- bind_rows(lapply(exposures_raw, function(x) {
+  run_crude_model(spatial_data_proj, "dc_binary", x,
+                  family = binomial, exponentiate = TRUE,
+                  outcome_label = "DC binary")
+}))
+
+# RUDAS — unadjusted
+unadj_rudas <- bind_rows(lapply(exposures_raw, function(x) {
+  run_crude_model(
+    spatial_data_proj |> filter(age_group == "older"),
+    "rudas_n", x, outcome_label = "RUDAS")
+}))
+
+# ACE — unadjusted
+unadj_ace <- bind_rows(lapply(exposures_raw, function(x) {
+  run_crude_model(
+    spatial_data_proj |> filter(age_group == "younger"),
+    "ace_n", x, outcome_label = "ACE")
+}))
+
+unadjusted_results <- bind_rows(unadj_binary, unadj_rudas, unadj_ace)
+
+# ============================================================
+# STAGE 2A: AGE & SEX ADJUSTED
+# ============================================================
+
+basic_binary <- bind_rows(lapply(exposures_raw, function(x) {
+  run_cluster_model(spatial_data_proj, "dc_binary", x,
+                    covariates = covs_basic,
+                    family = binomial, exponentiate = TRUE,
+                    outcome_label = "DC binary") |>
+    mutate(model = "Age & sex adjusted")
+}))
+
+basic_rudas <- bind_rows(lapply(exposures_raw, function(x) {
+  run_cluster_model(
+    spatial_data_proj |> filter(age_group == "older"),
+    "rudas_n", x, covariates = covs_basic,
+    outcome_label = "RUDAS") |>
+    mutate(model = "Age & sex adjusted")
+}))
+
+basic_ace <- bind_rows(lapply(exposures_raw, function(x) {
+  run_cluster_model(
+    spatial_data_proj |> filter(age_group == "younger"),
+    "ace_n", x, covariates = covs_basic,
+    outcome_label = "ACE") |>
+    mutate(model = "Age & sex adjusted")
+}))
+
+basic_adjusted_results <- bind_rows(basic_binary, basic_rudas, basic_ace)
+
+# ============================================================
+# STAGE 2B: FULLY ADJUSTED
+# ============================================================
+
+full_binary <- bind_rows(lapply(exposures_raw, function(x) {
+  run_cluster_model(spatial_data_proj, "dc_binary", x,
+                    covariates = covs_full,
+                    family = binomial, exponentiate = TRUE,
+                    outcome_label = "DC binary") |>
+    mutate(model = "Fully adjusted")
+}))
+
+full_rudas <- bind_rows(lapply(exposures_raw, function(x) {
+  run_cluster_model(
+    spatial_data_proj |> filter(age_group == "older"),
+    "rudas_n", x, covariates = covs_full,
+    outcome_label = "RUDAS") |>
+    mutate(model = "Fully adjusted")
+}))
+
+full_ace <- bind_rows(lapply(exposures_raw, function(x) {
+  run_cluster_model(
+    spatial_data_proj |> filter(age_group == "younger"),
+    "ace_n", x, covariates = covs_full,
+    outcome_label = "ACE") |>
+    mutate(model = "Fully adjusted")
+}))
+
+full_adjusted_results <- bind_rows(full_binary, full_rudas, full_ace)
+
+# ============================================================
+# COMBINE ALL INTO MASTER TABLE
+# ============================================================
+
+master_results <- bind_rows(
+  unadjusted_results,
+  basic_adjusted_results,
+  full_adjusted_results
+) |>
+  mutate(
+    exposure = case_when(
+      exposure == "exposure_pm25"     ~ "PM2.5",
+      exposure == "exposure_pm10"     ~ "PM10",
+      exposure == "exposure_temp"     ~ "Temperature",
+      exposure == "exposure_humidity" ~ "Humidity",
+      TRUE                            ~ exposure
+    ),
+    model = factor(model, levels = c("Unadjusted",
+                                     "Age & sex adjusted",
+                                     "Fully adjusted")),
+    outcome = factor(outcome, levels = c("DC binary", "ACE", "RUDAS"))
+  ) |>
+  select(outcome, exposure, model, estimate, conf.low, conf.high, p.value) |>
+  mutate(across(where(is.numeric), ~ round(., 3))) |>
+  arrange(outcome, exposure, model)
+
+# View
+master_results
+
+# Clean kable table
+master_results |>
+  kable(
+    caption = "Table 3. Association between environmental exposures and cognitive outcomes",
+    col.names = c("Outcome", "Exposure", "Model", 
+                  "Estimate", "95% CI Low", "95% CI High", "p-value")
+  ) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  collapse_rows(columns = 1:2, valign = "top")
+
+# ============================================================
+# STAGE 3: INTERACTION (road x SES, fully adjusted)
+# ============================================================
+
+int_data <- spatial_data_proj |>
+  st_drop_geometry() |>
+  filter(age_group == "younger") |>
+  select(ace_n, log_dist_road, ses_level, age_n, sex, bmi,
+         education_cat, civil_stat_cat, occupation_cat,
+         htn_cat, glucose_lev, chronic_dis, cluster_id) |>
+  na.omit()
+
+int_model <- lm(
+  ace_n ~ log_dist_road * ses_level + age_n + sex + bmi +
+    education_cat + civil_stat_cat + occupation_cat +
+    htn_cat + glucose_lev + chronic_dis,
+  data = int_data
+)
+
+vcov_cl <- sandwich::vcovCL(int_model, cluster = int_data$cluster_id)
+lmtest::coeftest(int_model, vcov = vcov_cl) |>
+  broom::tidy() |>
+  filter(str_detect(term, "log_dist_road")) |>
+  mutate(
+    conf.low  = estimate - 1.96 * std.error,
+    conf.high = estimate + 1.96 * std.error,
+    across(where(is.numeric), ~ round(., 3)),
+    term = case_when(
+      term == "log_dist_road"                      ~ "Log dist road (NSE E ref)",
+      term == "log_dist_road:ses_levelNSE D"       ~ "× NSE D",
+      term == "log_dist_road:ses_levelNSE C"       ~ "× NSE C",
+      term == "log_dist_road:ses_levelNSE B"       ~ "× NSE B",
+      term == "log_dist_road:ses_levelNSE A"       ~ "× NSE A (highest)",
+      TRUE                                         ~ term
+    )
+  ) |>
+  select(term, estimate, conf.low, conf.high, p.value)
+
+# ============================================================
+# STAGE 4: SENSITIVITY — road type stratification
+# ============================================================
+
+# (road_sensitivity already computed earlier — just clean and display)
+road_sensitivity |>
+  select(outcome, estimate, conf.low, conf.high, p.value) |>
+  mutate(across(where(is.numeric), ~ round(., 3))) |>
+  kable(
+    caption = "Sensitivity Table. Road type-stratified analyses (fully adjusted)",
+    col.names = c("Outcome", "Estimate", "95% CI Low", "95% CI High", "p-value")
+  ) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  pack_rows("Trunk roads", 1, 3) |>
+  pack_rows("Primary roads", 4, 6) |>
+  pack_rows("Secondary roads", 7, 9)
+```
+
+## Check master results
+
+```{r}
+master_results
+```
+
+## Add road proximity to master results
+
+```{r}
+# Unadjusted road
+unadj_road_binary <- run_crude_model(spatial_data_proj, "dc_binary", "log_dist_road", family = binomial, exponentiate = TRUE, outcome_label = "DC binary") |> mutate(model = "Unadjusted")
+unadj_road_rudas  <- run_crude_model(spatial_data_proj |> filter(age_group == "older"), "rudas_n", "log_dist_road", outcome_label = "RUDAS") |> mutate(model = "Unadjusted")
+unadj_road_ace    <- run_crude_model(spatial_data_proj |> filter(age_group == "younger"), "ace_n", "log_dist_road", outcome_label = "ACE") |> mutate(model = "Unadjusted")
+
+# Basic adjusted road
+basic_road_binary <- run_cluster_model(spatial_data_proj, "dc_binary", "log_dist_road", covariates = covs_basic, family = binomial, exponentiate = TRUE, outcome_label = "DC binary") |> mutate(model = "Age & sex adjusted")
+basic_road_rudas  <- run_cluster_model(spatial_data_proj |> filter(age_group == "older"), "rudas_n", "log_dist_road", covariates = covs_basic, outcome_label = "RUDAS") |> mutate(model = "Age & sex adjusted")
+basic_road_ace    <- run_cluster_model(spatial_data_proj |> filter(age_group == "younger"), "ace_n", "log_dist_road", covariates = covs_basic, outcome_label = "ACE") |> mutate(model = "Age & sex adjusted")
+
+# Fully adjusted road
+full_road_binary <- run_cluster_model(spatial_data_proj, "dc_binary", "log_dist_road", covariates = covs_full, family = binomial, exponentiate = TRUE, outcome_label = "DC binary") |> mutate(model = "Fully adjusted")
+full_road_rudas  <- run_cluster_model(spatial_data_proj |> filter(age_group == "older"), "rudas_n", "log_dist_road", covariates = covs_full, outcome_label = "RUDAS") |> mutate(model = "Fully adjusted")
+full_road_ace    <- run_cluster_model(spatial_data_proj |> filter(age_group == "younger"), "ace_n", "log_dist_road", covariates = covs_full, outcome_label = "ACE") |> mutate(model = "Fully adjusted")
+
+# Add to master
+road_results <- bind_rows(
+  unadj_road_binary, unadj_road_rudas, unadj_road_ace,
+  basic_road_binary, basic_road_rudas, basic_road_ace,
+  full_road_binary,  full_road_rudas,  full_road_ace
+) |> mutate(exposure = "Road distance (log)")
+
+master_results <- bind_rows(master_results, road_results) |>
+  mutate(
+    model   = factor(model, levels = c("Unadjusted", "Age & sex adjusted", "Fully adjusted")),
+    outcome = factor(outcome, levels = c("DC binary", "ACE", "RUDAS"))
+  ) |>
+  arrange(outcome, exposure, model)
+```
+
+## Check master results again, with road proximity added
+
+```{r}
+master_results
+```
+
+## Save results as CSV
+
+```{r}
+# Save master results and interaction table as CSVs for Python to pick up
+write.csv(master_results, "/tmp/master_results.csv", row.names = FALSE)
+
+# Interaction results
+int_table <- lmtest::coeftest(int_model, vcov = vcov_cl) |>
+  broom::tidy() |>
+  filter(str_detect(term, "log_dist_road")) |>
+  mutate(
+    conf.low  = estimate - 1.96 * std.error,
+    conf.high = estimate + 1.96 * std.error,
+    across(where(is.numeric), ~ round(., 3)),
+    term = case_when(
+      term == "log_dist_road"                      ~ "Log dist road (NSE E ref)",
+      term == "log_dist_road:ses_levelNSE D"       ~ "× NSE D",
+      term == "log_dist_road:ses_levelNSE C"       ~ "× NSE C",
+      term == "log_dist_road:ses_levelNSE B"       ~ "× NSE B",
+      term == "log_dist_road:ses_levelNSE A"       ~ "× NSE A (highest)",
+      TRUE ~ term
+    )
+  ) |>
+  select(term, estimate, conf.low, conf.high, p.value)
+
+write.csv(int_table, "/Users/gabriellebenoit/Documents/GitHub/peru_air/int_table.csv", row.names = FALSE)
+write.csv(road_sensitivity, "/Users/gabriellebenoit/Documents/GitHub/peru_air/road_sensitivity.csv", row.names = FALSE)
+
+# Forest plot data — combined
+write.csv(master_results, "/Users/gabriellebenoit/Documents/GitHub/peru_air/forest_data.csv", row.names = FALSE)
+```
+
+## Figures
+
+```{r}
+
+# ── Excel export ────────────────────────────────────────────────────────────
+write_xlsx(
+  list(
+    "Table 3 - All Models"       = master_results,
+    "Table 5 - Interaction"      = int_table,
+    "Sensitivity - Road Type"    = road_sensitivity
+  ),
+  path = "results_tables.xlsx"
+)
+
+# ── Forest plot helper ───────────────────────────────────────────────────────
+make_forest <- function(data, title, filename, width = 14, height = 6) {
+  
+  data <- data |>
+    mutate(
+      model = factor(model, levels = c("Unadjusted",
+                                       "Age & sex adjusted",
+                                       "Fully adjusted")),
+      null_line = ifelse(outcome == "DC binary", 1, 0)
+    )
+
+  p <- ggplot(data, aes(x = estimate, y = exposure,
+                        color = model, shape = model)) +
+    geom_vline(aes(xintercept = null_line),
+               linetype = "dashed", color = "grey50") +
+    geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
+                   height = 0.2, position = position_dodge(width = 0.6)) +
+    geom_point(size = 3, position = position_dodge(width = 0.6)) +
+    facet_wrap(~ outcome, scales = "free_x", ncol = 3) +
+    scale_color_manual(values = c(
+      "Unadjusted"         = "#95A5A6",
+      "Age & sex adjusted" = "#2E75B6",
+      "Fully adjusted"     = "#1F4E79"
+    )) +
+    scale_shape_manual(values = c(
+      "Unadjusted"         = 18,
+      "Age & sex adjusted" = 16,
+      "Fully adjusted"     = 15
+    )) +
+    labs(
+      title    = title,
+      x        = "Effect estimate (OR for binary; β for continuous)",
+      y        = NULL,
+      color    = "Model",
+      shape    = "Model",
+      caption  = "Cluster-robust SEs | * p<0.05"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      legend.position  = "bottom",
+      strip.text       = element_text(face = "bold", color = "#1F4E79"),
+      panel.grid.minor = element_blank()
+    )
+
+  ggsave(filename, p, width = width, height = height, dpi = 300)
+}
+
+# ── Figure 1: Air quality only ───────────────────────────────────────────────
+make_forest(
+  data     = master_results |> filter(exposure %in% c("PM2.5","PM10","Temperature","Humidity")),
+  title    = "Figure 1. Air quality exposures and cognitive outcomes",
+  filename = "figure1_airquality.png",
+  width    = 14, height = 6
+)
+
+# ── Figure 2: Road distance only ─────────────────────────────────────────────
+make_forest(
+  data     = master_results |> filter(exposure == "Road distance (log)"),
+  title    = "Figure 2. Road proximity and cognitive outcomes",
+  filename = "figure2_road.png",
+  width    = 10, height = 4
+)
+
+# ── Figure 3: Combined ───────────────────────────────────────────────────────
+make_forest(
+  data     = master_results,
+  title    = "Figure 3. All environmental exposures and cognitive outcomes",
+  filename = "figure3_combined.png",
+  width    = 14, height = 9
+)
+```

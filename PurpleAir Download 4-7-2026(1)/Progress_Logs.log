@@ -1,0 +1,101 @@
+Progress Logs
+-------------
+Sensors With Data in Time Range: 11
+Sensors Without Data in Time Range: 0
+
+Sensors Not Found: 0
+Invalid Sensor Indexes: 0
+Sensor Indexes Encountering Other Errors: 0
+Sensor Indexes Not Processed: 0
+
+Start Timestamp: 2022-01-01T00:00:00Z
+End Timestamp: 2026-01-10T00:00:00Z
+Average: 43200
+Fields: pm10.0_atm_a,pm10.0_atm_b,pm10.0_atm,voc_a,voc_b,voc,humidity,humidity_a,humidity_b,temperature,temperature_a,temperature_b,pm2.5_atm_a,pm2.5_atm_b,pm2.5_atm
+Total Data Rows Downloaded: 241
+
+Number of Sensors: 11
+Number of Read Keys: 0
+
+Download Started at: 2026-04-07T23:02:51-07:00
+Download Ended   at: 2026-04-07T23:04:58-07:00
+Download Took: 2.1 minutes
+
+-------------
+Sensor Indexes Not Found:
+
+
+Invalid Sensor Indexes:
+
+
+Sensors Without Any Data For Specified Time Period:
+
+
+Sensors Where No Download Was Attempted Yet Due to Process Being Aborted:
+
+
+Aborted on Sensors:
+
+
+Sensors With Number of Downloaded Data Rows:
+129323 : 43 data rows
+159005 : 17 data rows
+159435 : 16 data rows
+159465 : 17 data rows
+159599 : 22 data rows
+180021 : 13 data rows
+180043 : 21 data rows
+180073 : 17 data rows
+180119 : 30 data rows
+180251 : 15 data rows
+180321 : 30 data rows
+  
+
+-------------
+Starting requests for sensor 129323.
+Making request 1 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 129323. Downloaded 43 rows of data.
+
+Starting requests for sensor 159005.
+Making request 2 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 159005. Downloaded 17 rows of data.
+
+Starting requests for sensor 159435.
+Making request 3 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 159435. Downloaded 16 rows of data.
+
+Starting requests for sensor 159465.
+Making request 4 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 159465. Downloaded 17 rows of data.
+
+Starting requests for sensor 159599.
+Making request 5 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 159599. Downloaded 22 rows of data.
+
+Starting requests for sensor 180021.
+Making request 6 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 180021. Downloaded 13 rows of data.
+
+Starting requests for sensor 180043.
+Making request 7 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 180043. Downloaded 21 rows of data.
+
+Starting requests for sensor 180073.
+Making request 8 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 180073. Downloaded 17 rows of data.
+
+Starting requests for sensor 180119.
+Making request 9 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 180119. Downloaded 30 rows of data.
+
+Starting requests for sensor 180251.
+Making request 10 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 180251. Downloaded 15 rows of data.
+
+Starting requests for sensor 180321.
+Making request 11 from 2022-01-01 to 2026-01-10
+Data download completed for sensor 180321. Downloaded 30 rows of data.
+
+
+Download request has been completed. Scroll down for a summary:
+--------------------------------------
