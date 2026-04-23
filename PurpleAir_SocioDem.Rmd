@@ -1664,12 +1664,12 @@ buffer_summary |>
   pivot_longer(cols = c(pct_dc, mean_rudas, mean_ace),
                names_to = "outcome", values_to = "value") |>
   mutate(outcome = recode(outcome,
-    pct_dc     = "% cognitive decline",
+    pct_dc     = "% cognitive impairment",
     mean_rudas = "mean RUDAS (out of 30)",
     mean_ace   = "mean ACE (out of 100)"
   ),
   outcome = factor(outcome, levels = c(
-    "% cognitive decline", "mean RUDAS (out of 30)", "mean ACE (out of 100)"
+    "% cognitive impairment", "mean RUDAS (out of 30)", "mean ACE (out of 100)"
   ))) |>
   ggplot(aes(x = buffer_zone, y = value, fill = buffer_zone)) +
   geom_col(width = 0.7) +
@@ -1887,7 +1887,7 @@ continuous_vars <- c("age", "bmi")
 categorical_vars <- c(
   "sex", "education_cat", "civil_stat_cat",
   "htn_cat", "native_lang", "health_ins_cat",
-  "occupation_cat", "chronic_dis"
+  "occupation_cat", "chronic_dis", "ses_level"
 )
 
 # ---- continuous summaries ----
@@ -1933,7 +1933,7 @@ my_table <- spatial_data_proj |>
   st_drop_geometry() |>
   select(
     nearest_sensor_name, age, sex, ace_score, rudas, education_cat, civil_stat_cat,
-    bmi, htn_cat, native_lang, health_ins_cat, occupation_cat, chronic_dis
+    bmi, htn_cat, native_lang, health_ins_cat, occupation_cat, chronic_dis, ses_level
   ) |>
   tbl_summary(
     by = nearest_sensor_name,
@@ -2287,6 +2287,33 @@ spatial_data_proj |>
   ) +
   theme_minimal()
 ```
+```{r}
+ses_table <- spatial_data_proj |>
+  st_drop_geometry() |>
+  count(nearest_sensor_name, ses_level) |>
+  group_by(nearest_sensor_name) |>
+  mutate(prop = n / sum(n)) |>
+  ungroup() |>
+  select(-n) |>
+  pivot_wider(
+    names_from = ses_level,
+    values_from = prop
+  ) |>
+  mutate(
+    nearest_sensor_name = recode(nearest_sensor_name,
+      "GEOHealth_Ventanilla_NSBelen" = "Ventanilla",
+      "GEOHealth_SanMa_IE005" = "SanMa",
+      "GEOHealth_PuenteP_Estadio_1" = "PuenteP Estadio",
+      "GEOHealth_MiPeru_Chavinillo" = "MiPeru",
+      "GeoHealth_Comas_2055PAbril" = "Comas",
+      "GEOHealth_Carab_VictorRaulHT" = "Carab"
+    )
+  )
+
+ses_table
+```
+
+
 
 ## Chi-Square / Kruskal-Wallis Tests by Sector
 
@@ -3080,7 +3107,14 @@ make_forest <- function(data, title, filename, width = 14, height = 6) {
     geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
                    height = 0.2, position = position_dodge(width = 0.6)) +
     geom_point(size = 3, position = position_dodge(width = 0.6)) +
-    facet_wrap(~ outcome, scales = "free_x", ncol = 3) +
+    facet_wrap(
+  ~ outcome,
+  scales = "free_x",
+  ncol = 3,
+  labeller = labeller(outcome = c(
+    "DC binary" = "Cognitive impairment (binary)"
+  ))
+) +
     scale_color_manual(values = c(
       "Unadjusted"         = "#95A5A6",
       "Age & sex adjusted" = "#2E75B6",
@@ -3133,3 +3167,68 @@ make_forest(
   width    = 14, height = 9
 )
 ```
+
+
+
+## SES by sensor-assigned PM2.5
+SES was not meaningfully associated with sensor-assigned PM2.5 (mean PM2.5 was essentially stable across NSE groups: ~33.3 to 33.6 μg/m3), confirming that SES does not confound the PM2.5 null result. 
+```{r}
+ses_pm25_summary <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  group_by(ses_level) %>%
+  summarise(
+    n = n(),
+    mean_pm25 = mean(exposure_pm25, na.rm = TRUE),
+    sd_pm25   = sd(exposure_pm25, na.rm = TRUE)
+  ) %>%
+  arrange(ses_level)
+
+ses_pm25_summary
+
+anova_data <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  select(ses_level, exposure_pm25) %>%
+  filter(!is.na(ses_level), !is.na(exposure_pm25))
+
+pm25_aov <- aov(exposure_pm25 ~ ses_level, data = anova_data)
+
+summary(pm25_aov)
+
+sensor_tests <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  filter(!is.na(ses_level), !is.na(exposure_pm25)) %>%
+  group_by(nearest_sensor_name) %>%
+  do(tidy(aov(exposure_pm25 ~ ses_level, data = .))) %>%
+  filter(term == "ses_level") %>%
+  select(nearest_sensor_name, p.value)
+
+sensor_tests
+
+ses_road_summary <- spatial_data_proj %>%
+  st_drop_geometry() %>%
+  group_by(ses_level) %>%
+  summarise(
+    n = n(),
+    mean_distance = mean(dist_to_road_m, na.rm = TRUE),
+    sd_distance   = sd(dist_to_road_m, na.rm = TRUE)
+  )
+
+ses_road_summary
+
+
+model <- lm(dist_to_road_m ~ ses_level,
+            data = spatial_data_proj %>% st_drop_geometry())
+
+summary(model)
+
+summary(model)$r.squared
+
+anova(model)
+
+spatial_data_proj %>%
+  st_drop_geometry() %>%
+  mutate(ses_num = as.numeric(factor(ses_level, ordered = TRUE))) %>%
+  lm(dist_to_road_m ~ ses_num, data = .) %>%
+  summary()
+```
+
