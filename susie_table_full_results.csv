@@ -1,0 +1,265 @@
+"outcome","exposure_var","model","term","estimate","conf.low","conf.high","p.value"
+"ACE","Humidity","Age & sex adjusted","Humidity (per SD)",-0.071,-0.854,0.711,0.858
+"ACE","Humidity","Age & sex adjusted","Age",-0.279,-0.368,-0.19,0
+"ACE","Humidity","Age & sex adjusted","Sex (Male)",3.824,2.177,5.472,0
+"ACE","Humidity","Fully adjusted","Humidity (per SD)",-0.273,-0.971,0.425,0.443
+"ACE","Humidity","Fully adjusted","Age",-0.162,-0.25,-0.074,0
+"ACE","Humidity","Fully adjusted","Sex (Male)",1.229,-0.55,3.009,0.176
+"ACE","Humidity","Fully adjusted","SES: NSE D",1.135,-3.768,6.038,0.65
+"ACE","Humidity","Fully adjusted","SES: NSE C",3.613,0.046,7.18,0.047
+"ACE","Humidity","Fully adjusted","SES: NSE B",6.719,3.276,10.163,0
+"ACE","Humidity","Fully adjusted","SES: NSE A (Highest)",7.566,3.667,11.465,0
+"ACE","Humidity","Fully adjusted","bmi",-0.024,-0.159,0.112,0.733
+"ACE","Humidity","Fully adjusted","education_catprimary",18.072,8.713,27.431,0
+"ACE","Humidity","Fully adjusted","education_catsecondary_or_higher",27.394,18.185,36.604,0
+"ACE","Humidity","Fully adjusted","civil_stat_catsingle",0.133,-1.576,1.841,0.879
+"ACE","Humidity","Fully adjusted","civil_stat_catseparated_widowed",0.298,-2.144,2.74,0.811
+"ACE","Humidity","Fully adjusted","occupation_cathomemaker",-1.105,-2.773,0.563,0.194
+"ACE","Humidity","Fully adjusted","occupation_catnot_employed",-0.906,-3.486,1.674,0.492
+"ACE","Humidity","Fully adjusted","htn_cathypertension",-2.159,-4.106,-0.212,0.03
+"ACE","Humidity","Fully adjusted","glucose_catPrediabetes",-0.104,-1.833,1.625,0.906
+"ACE","Humidity","Fully adjusted","glucose_catDiabetes",0.523,-1.481,2.526,0.609
+"ACE","Humidity","Fully adjusted","chronic_disSí",0.884,-0.66,2.427,0.262
+"ACE","Humidity","Unadjusted","Humidity (per SD)",-0.128,-0.938,0.682,0.757
+"ACE","PM10","Age & sex adjusted","PM10 (per SD)",-0.046,-0.836,0.744,0.91
+"ACE","PM10","Age & sex adjusted","Age",-0.279,-0.368,-0.19,0
+"ACE","PM10","Age & sex adjusted","Sex (Male)",3.824,2.178,5.471,0
+"ACE","PM10","Fully adjusted","PM10 (per SD)",0.169,-0.555,0.894,0.647
+"ACE","PM10","Fully adjusted","Age",-0.163,-0.251,-0.075,0
+"ACE","PM10","Fully adjusted","Sex (Male)",1.226,-0.551,3.004,0.177
+"ACE","PM10","Fully adjusted","SES: NSE D",1.109,-3.788,6.006,0.657
+"ACE","PM10","Fully adjusted","SES: NSE C",3.6,0.039,7.161,0.048
+"ACE","PM10","Fully adjusted","SES: NSE B",6.719,3.277,10.161,0
+"ACE","PM10","Fully adjusted","SES: NSE A (Highest)",7.571,3.676,11.465,0
+"ACE","PM10","Fully adjusted","bmi",-0.021,-0.157,0.114,0.76
+"ACE","PM10","Fully adjusted","education_catprimary",18.124,8.745,27.503,0
+"ACE","PM10","Fully adjusted","education_catsecondary_or_higher",27.415,18.192,36.639,0
+"ACE","PM10","Fully adjusted","civil_stat_catsingle",0.153,-1.556,1.861,0.861
+"ACE","PM10","Fully adjusted","civil_stat_catseparated_widowed",0.319,-2.119,2.757,0.797
+"ACE","PM10","Fully adjusted","occupation_cathomemaker",-1.103,-2.774,0.569,0.196
+"ACE","PM10","Fully adjusted","occupation_catnot_employed",-0.902,-3.477,1.673,0.492
+"ACE","PM10","Fully adjusted","htn_cathypertension",-2.149,-4.097,-0.201,0.031
+"ACE","PM10","Fully adjusted","glucose_catPrediabetes",-0.099,-1.827,1.628,0.91
+"ACE","PM10","Fully adjusted","glucose_catDiabetes",0.539,-1.461,2.538,0.598
+"ACE","PM10","Fully adjusted","chronic_disSí",0.877,-0.668,2.422,0.266
+"ACE","PM10","Unadjusted","PM10 (per SD)",0.017,-0.85,0.884,0.969
+"ACE","PM2.5","Age & sex adjusted","PM2.5 (per SD)",0.282,-0.504,1.069,0.482
+"ACE","PM2.5","Age & sex adjusted","Age",-0.281,-0.37,-0.192,0
+"ACE","PM2.5","Age & sex adjusted","Sex (Male)",3.814,2.167,5.462,0
+"ACE","PM2.5","Fully adjusted","PM2.5 (per SD)",0.168,-0.56,0.896,0.651
+"ACE","PM2.5","Fully adjusted","Age",-0.165,-0.252,-0.078,0
+"ACE","PM2.5","Fully adjusted","Sex (Male)",1.227,-0.55,3.003,0.176
+"ACE","PM2.5","Fully adjusted","SES: NSE D",1.102,-3.816,6.02,0.661
+"ACE","PM2.5","Fully adjusted","SES: NSE C",3.592,0.02,7.163,0.049
+"ACE","PM2.5","Fully adjusted","SES: NSE B",6.707,3.256,10.158,0
+"ACE","PM2.5","Fully adjusted","SES: NSE A (Highest)",7.565,3.662,11.468,0
+"ACE","PM2.5","Fully adjusted","bmi",-0.019,-0.155,0.116,0.78
+"ACE","PM2.5","Fully adjusted","education_catprimary",18.133,8.741,27.524,0
+"ACE","PM2.5","Fully adjusted","education_catsecondary_or_higher",27.4,18.15,36.65,0
+"ACE","PM2.5","Fully adjusted","civil_stat_catsingle",0.161,-1.544,1.866,0.853
+"ACE","PM2.5","Fully adjusted","civil_stat_catseparated_widowed",0.318,-2.121,2.758,0.798
+"ACE","PM2.5","Fully adjusted","occupation_cathomemaker",-1.106,-2.777,0.564,0.195
+"ACE","PM2.5","Fully adjusted","occupation_catnot_employed",-0.901,-3.472,1.67,0.492
+"ACE","PM2.5","Fully adjusted","htn_cathypertension",-2.147,-4.101,-0.193,0.032
+"ACE","PM2.5","Fully adjusted","glucose_catPrediabetes",-0.102,-1.829,1.625,0.908
+"ACE","PM2.5","Fully adjusted","glucose_catDiabetes",0.536,-1.463,2.535,0.599
+"ACE","PM2.5","Fully adjusted","chronic_disSí",0.879,-0.669,2.427,0.266
+"ACE","PM2.5","Unadjusted","PM2.5 (per SD)",0.174,-0.683,1.031,0.69
+"ACE","Temperature","Age & sex adjusted","Temperature (per SD)",0.223,-0.571,1.017,0.582
+"ACE","Temperature","Age & sex adjusted","Age",-0.279,-0.369,-0.19,0
+"ACE","Temperature","Age & sex adjusted","Sex (Male)",3.816,2.17,5.461,0
+"ACE","Temperature","Fully adjusted","Temperature (per SD)",0.281,-0.422,0.984,0.434
+"ACE","Temperature","Fully adjusted","Age",-0.164,-0.252,-0.076,0
+"ACE","Temperature","Fully adjusted","Sex (Male)",1.237,-0.546,3.02,0.174
+"ACE","Temperature","Fully adjusted","SES: NSE D",0.962,-3.985,5.91,0.703
+"ACE","Temperature","Fully adjusted","SES: NSE C",3.526,-0.072,7.124,0.055
+"ACE","Temperature","Fully adjusted","SES: NSE B",6.696,3.226,10.166,0
+"ACE","Temperature","Fully adjusted","SES: NSE A (Highest)",7.51,3.588,11.433,0
+"ACE","Temperature","Fully adjusted","bmi",-0.024,-0.159,0.111,0.729
+"ACE","Temperature","Fully adjusted","education_catprimary",18,8.559,27.441,0
+"ACE","Temperature","Fully adjusted","education_catsecondary_or_higher",27.285,17.973,36.597,0
+"ACE","Temperature","Fully adjusted","civil_stat_catsingle",0.178,-1.53,1.886,0.838
+"ACE","Temperature","Fully adjusted","civil_stat_catseparated_widowed",0.365,-2.08,2.81,0.77
+"ACE","Temperature","Fully adjusted","occupation_cathomemaker",-1.088,-2.758,0.581,0.202
+"ACE","Temperature","Fully adjusted","occupation_catnot_employed",-0.891,-3.472,1.69,0.499
+"ACE","Temperature","Fully adjusted","htn_cathypertension",-2.209,-4.154,-0.263,0.026
+"ACE","Temperature","Fully adjusted","glucose_catPrediabetes",-0.106,-1.83,1.617,0.904
+"ACE","Temperature","Fully adjusted","glucose_catDiabetes",0.566,-1.428,2.56,0.578
+"ACE","Temperature","Fully adjusted","chronic_disSí",0.863,-0.683,2.409,0.274
+"ACE","Temperature","Unadjusted","Temperature (per SD)",0.203,-0.646,1.053,0.639
+"DC binary","Humidity","Age & sex adjusted","Humidity (per SD)",1.067,0.896,1.27,0.469
+"DC binary","Humidity","Age & sex adjusted","Age",0.987,0.976,0.998,0.025
+"DC binary","Humidity","Age & sex adjusted","Sex (Male)",0.348,0.217,0.559,0
+"DC binary","Humidity","Fully adjusted","Humidity (per SD)",1.134,0.942,1.366,0.184
+"DC binary","Humidity","Fully adjusted","Age",0.961,0.943,0.978,0
+"DC binary","Humidity","Fully adjusted","Sex (Male)",0.58,0.331,1.016,0.057
+"DC binary","Humidity","Fully adjusted","SES: NSE D",0.588,0.247,1.401,0.231
+"DC binary","Humidity","Fully adjusted","SES: NSE C",0.519,0.267,1.009,0.053
+"DC binary","Humidity","Fully adjusted","SES: NSE B",0.293,0.147,0.583,0
+"DC binary","Humidity","Fully adjusted","SES: NSE A (Highest)",0.358,0.126,1.021,0.055
+"DC binary","Humidity","Fully adjusted","bmi",1.026,0.989,1.064,0.178
+"DC binary","Humidity","Fully adjusted","education_catprimary",0.56,0.285,1.101,0.093
+"DC binary","Humidity","Fully adjusted","education_catsecondary_or_higher",0.1,0.046,0.218,0
+"DC binary","Humidity","Fully adjusted","civil_stat_catsingle",1.034,0.644,1.659,0.891
+"DC binary","Humidity","Fully adjusted","civil_stat_catseparated_widowed",0.891,0.481,1.651,0.713
+"DC binary","Humidity","Fully adjusted","occupation_cathomemaker",1.306,0.825,2.068,0.254
+"DC binary","Humidity","Fully adjusted","occupation_catnot_employed",0.858,0.457,1.609,0.632
+"DC binary","Humidity","Fully adjusted","htn_cathypertension",1.418,0.887,2.267,0.145
+"DC binary","Humidity","Fully adjusted","glucose_catPrediabetes",1.058,0.648,1.725,0.823
+"DC binary","Humidity","Fully adjusted","glucose_catDiabetes",1.073,0.625,1.843,0.798
+"DC binary","Humidity","Fully adjusted","chronic_disSí",0.921,0.59,1.44,0.72
+"DC binary","Humidity","Unadjusted","Humidity (per SD)",1.064,0.888,1.275,0.503
+"DC binary","PM10","Age & sex adjusted","PM10 (per SD)",0.904,0.737,1.109,0.333
+"DC binary","PM10","Age & sex adjusted","Age",0.987,0.976,0.999,0.027
+"DC binary","PM10","Age & sex adjusted","Sex (Male)",0.347,0.216,0.557,0
+"DC binary","PM10","Fully adjusted","PM10 (per SD)",0.836,0.665,1.051,0.125
+"DC binary","PM10","Fully adjusted","Age",0.961,0.944,0.979,0
+"DC binary","PM10","Fully adjusted","Sex (Male)",0.574,0.328,1.004,0.052
+"DC binary","PM10","Fully adjusted","SES: NSE D",0.589,0.249,1.389,0.226
+"DC binary","PM10","Fully adjusted","SES: NSE C",0.517,0.268,0.997,0.049
+"DC binary","PM10","Fully adjusted","SES: NSE B",0.295,0.149,0.582,0
+"DC binary","PM10","Fully adjusted","SES: NSE A (Highest)",0.355,0.125,1.009,0.052
+"DC binary","PM10","Fully adjusted","bmi",1.024,0.988,1.063,0.198
+"DC binary","PM10","Fully adjusted","education_catprimary",0.545,0.279,1.064,0.075
+"DC binary","PM10","Fully adjusted","education_catsecondary_or_higher",0.097,0.045,0.212,0
+"DC binary","PM10","Fully adjusted","civil_stat_catsingle",1.033,0.644,1.656,0.893
+"DC binary","PM10","Fully adjusted","civil_stat_catseparated_widowed",0.876,0.471,1.631,0.676
+"DC binary","PM10","Fully adjusted","occupation_cathomemaker",1.288,0.813,2.039,0.281
+"DC binary","PM10","Fully adjusted","occupation_catnot_employed",0.862,0.461,1.615,0.644
+"DC binary","PM10","Fully adjusted","htn_cathypertension",1.402,0.877,2.24,0.158
+"DC binary","PM10","Fully adjusted","glucose_catPrediabetes",1.058,0.65,1.724,0.82
+"DC binary","PM10","Fully adjusted","glucose_catDiabetes",1.081,0.63,1.854,0.778
+"DC binary","PM10","Fully adjusted","chronic_disSí",0.915,0.583,1.434,0.697
+"DC binary","PM10","Unadjusted","PM10 (per SD)",0.908,0.739,1.116,0.36
+"DC binary","PM2.5","Age & sex adjusted","PM2.5 (per SD)",0.913,0.748,1.114,0.37
+"DC binary","PM2.5","Age & sex adjusted","Age",0.987,0.976,0.999,0.027
+"DC binary","PM2.5","Age & sex adjusted","Sex (Male)",0.349,0.217,0.56,0
+"DC binary","PM2.5","Fully adjusted","PM2.5 (per SD)",0.92,0.756,1.12,0.405
+"DC binary","PM2.5","Fully adjusted","Age",0.961,0.944,0.979,0
+"DC binary","PM2.5","Fully adjusted","Sex (Male)",0.58,0.331,1.014,0.056
+"DC binary","PM2.5","Fully adjusted","SES: NSE D",0.61,0.257,1.45,0.264
+"DC binary","PM2.5","Fully adjusted","SES: NSE C",0.533,0.275,1.033,0.062
+"DC binary","PM2.5","Fully adjusted","SES: NSE B",0.302,0.152,0.598,0.001
+"DC binary","PM2.5","Fully adjusted","SES: NSE A (Highest)",0.363,0.127,1.036,0.058
+"DC binary","PM2.5","Fully adjusted","bmi",1.024,0.987,1.063,0.2
+"DC binary","PM2.5","Fully adjusted","education_catprimary",0.544,0.277,1.07,0.078
+"DC binary","PM2.5","Fully adjusted","education_catsecondary_or_higher",0.1,0.046,0.218,0
+"DC binary","PM2.5","Fully adjusted","civil_stat_catsingle",1.018,0.636,1.629,0.94
+"DC binary","PM2.5","Fully adjusted","civil_stat_catseparated_widowed",0.867,0.464,1.62,0.654
+"DC binary","PM2.5","Fully adjusted","occupation_cathomemaker",1.315,0.833,2.078,0.24
+"DC binary","PM2.5","Fully adjusted","occupation_catnot_employed",0.868,0.464,1.623,0.657
+"DC binary","PM2.5","Fully adjusted","htn_cathypertension",1.415,0.886,2.262,0.146
+"DC binary","PM2.5","Fully adjusted","glucose_catPrediabetes",1.048,0.646,1.702,0.848
+"DC binary","PM2.5","Fully adjusted","glucose_catDiabetes",1.065,0.623,1.822,0.817
+"DC binary","PM2.5","Fully adjusted","chronic_disSí",0.921,0.588,1.443,0.72
+"DC binary","PM2.5","Unadjusted","PM2.5 (per SD)",0.903,0.733,1.112,0.336
+"DC binary","Temperature","Age & sex adjusted","Temperature (per SD)",1.081,0.9,1.299,0.406
+"DC binary","Temperature","Age & sex adjusted","Age",0.987,0.976,0.998,0.024
+"DC binary","Temperature","Age & sex adjusted","Sex (Male)",0.347,0.216,0.556,0
+"DC binary","Temperature","Fully adjusted","Temperature (per SD)",1.09,0.895,1.328,0.391
+"DC binary","Temperature","Fully adjusted","Age",0.961,0.944,0.979,0
+"DC binary","Temperature","Fully adjusted","Sex (Male)",0.579,0.332,1.011,0.055
+"DC binary","Temperature","Fully adjusted","SES: NSE D",0.607,0.255,1.446,0.26
+"DC binary","Temperature","Fully adjusted","SES: NSE C",0.527,0.272,1.02,0.057
+"DC binary","Temperature","Fully adjusted","SES: NSE B",0.296,0.15,0.585,0
+"DC binary","Temperature","Fully adjusted","SES: NSE A (Highest)",0.355,0.124,1.015,0.053
+"DC binary","Temperature","Fully adjusted","bmi",1.024,0.988,1.063,0.196
+"DC binary","Temperature","Fully adjusted","education_catprimary",0.533,0.271,1.049,0.068
+"DC binary","Temperature","Fully adjusted","education_catsecondary_or_higher",0.099,0.045,0.215,0
+"DC binary","Temperature","Fully adjusted","civil_stat_catsingle",1.01,0.633,1.613,0.965
+"DC binary","Temperature","Fully adjusted","civil_stat_catseparated_widowed",0.873,0.469,1.624,0.667
+"DC binary","Temperature","Fully adjusted","occupation_cathomemaker",1.323,0.838,2.087,0.23
+"DC binary","Temperature","Fully adjusted","occupation_catnot_employed",0.863,0.462,1.613,0.644
+"DC binary","Temperature","Fully adjusted","htn_cathypertension",1.405,0.882,2.239,0.153
+"DC binary","Temperature","Fully adjusted","glucose_catPrediabetes",1.038,0.639,1.687,0.88
+"DC binary","Temperature","Fully adjusted","glucose_catDiabetes",1.046,0.614,1.78,0.87
+"DC binary","Temperature","Fully adjusted","chronic_disSí",0.923,0.59,1.444,0.727
+"DC binary","Temperature","Unadjusted","Temperature (per SD)",1.061,0.884,1.274,0.522
+"RUDAS","Humidity","Age & sex adjusted","Humidity (per SD)",-0.581,-1.142,-0.021,0.045
+"RUDAS","Humidity","Age & sex adjusted","Age",0.008,-0.109,0.125,0.891
+"RUDAS","Humidity","Age & sex adjusted","Sex (Male)",0.106,-1.369,1.581,0.889
+"RUDAS","Humidity","Fully adjusted","Humidity (per SD)",-0.422,-0.951,0.107,0.122
+"RUDAS","Humidity","Fully adjusted","Age",0.038,-0.093,0.169,0.571
+"RUDAS","Humidity","Fully adjusted","Sex (Male)",-1.213,-2.739,0.313,0.124
+"RUDAS","Humidity","Fully adjusted","SES: NSE D",0.832,-2.386,4.051,0.614
+"RUDAS","Humidity","Fully adjusted","SES: NSE C",1.308,-1.774,4.391,0.408
+"RUDAS","Humidity","Fully adjusted","SES: NSE B",1.306,-1.691,4.303,0.396
+"RUDAS","Humidity","Fully adjusted","SES: NSE A (Highest)",2.058,-1.046,5.163,0.198
+"RUDAS","Humidity","Fully adjusted","bmi",0.006,-0.094,0.107,0.905
+"RUDAS","Humidity","Fully adjusted","education_catprimary",0.202,-2.348,2.752,0.877
+"RUDAS","Humidity","Fully adjusted","education_catsecondary_or_higher",-0.754,-2.982,1.475,0.51
+"RUDAS","Humidity","Fully adjusted","civil_stat_catsingle",1.435,-0.648,3.518,0.181
+"RUDAS","Humidity","Fully adjusted","civil_stat_catseparated_widowed",0.184,-1.367,1.735,0.817
+"RUDAS","Humidity","Fully adjusted","occupation_cathomemaker",-2.937,-5.567,-0.307,0.032
+"RUDAS","Humidity","Fully adjusted","occupation_catnot_employed",-0.754,-2.392,0.885,0.37
+"RUDAS","Humidity","Fully adjusted","htn_cathypertension",0.226,-1.134,1.586,0.745
+"RUDAS","Humidity","Fully adjusted","glucose_catPrediabetes",0.199,-1.674,2.071,0.836
+"RUDAS","Humidity","Fully adjusted","glucose_catDiabetes",-0.309,-2.215,1.597,0.751
+"RUDAS","Humidity","Fully adjusted","chronic_disSí",-2.034,-3.494,-0.574,0.008
+"RUDAS","Humidity","Unadjusted","Humidity (per SD)",-0.572,-1.126,-0.018,0.046
+"RUDAS","PM10","Age & sex adjusted","PM10 (per SD)",0.438,-0.104,0.98,0.117
+"RUDAS","PM10","Age & sex adjusted","Age",0.006,-0.11,0.123,0.915
+"RUDAS","PM10","Age & sex adjusted","Sex (Male)",0.063,-1.41,1.535,0.934
+"RUDAS","PM10","Fully adjusted","PM10 (per SD)",0.319,-0.125,0.764,0.164
+"RUDAS","PM10","Fully adjusted","Age",0.035,-0.096,0.166,0.607
+"RUDAS","PM10","Fully adjusted","Sex (Male)",-1.282,-2.807,0.244,0.104
+"RUDAS","PM10","Fully adjusted","SES: NSE D",0.821,-2.423,4.065,0.622
+"RUDAS","PM10","Fully adjusted","SES: NSE C",1.365,-1.779,4.508,0.398
+"RUDAS","PM10","Fully adjusted","SES: NSE B",1.319,-1.689,4.326,0.393
+"RUDAS","PM10","Fully adjusted","SES: NSE A (Highest)",2.042,-1.098,5.182,0.207
+"RUDAS","PM10","Fully adjusted","bmi",0.004,-0.098,0.105,0.946
+"RUDAS","PM10","Fully adjusted","education_catprimary",0.231,-2.333,2.795,0.86
+"RUDAS","PM10","Fully adjusted","education_catsecondary_or_higher",-0.661,-2.866,1.544,0.559
+"RUDAS","PM10","Fully adjusted","civil_stat_catsingle",1.572,-0.498,3.643,0.141
+"RUDAS","PM10","Fully adjusted","civil_stat_catseparated_widowed",0.171,-1.379,1.72,0.83
+"RUDAS","PM10","Fully adjusted","occupation_cathomemaker",-3.062,-5.636,-0.488,0.023
+"RUDAS","PM10","Fully adjusted","occupation_catnot_employed",-0.728,-2.378,0.923,0.39
+"RUDAS","PM10","Fully adjusted","htn_cathypertension",0.21,-1.135,1.556,0.76
+"RUDAS","PM10","Fully adjusted","glucose_catPrediabetes",0.173,-1.698,2.044,0.857
+"RUDAS","PM10","Fully adjusted","glucose_catDiabetes",-0.279,-2.192,1.634,0.776
+"RUDAS","PM10","Fully adjusted","chronic_disSí",-1.961,-3.507,-0.416,0.015
+"RUDAS","PM10","Unadjusted","PM10 (per SD)",0.435,-0.103,0.973,0.117
+"RUDAS","PM2.5","Age & sex adjusted","PM2.5 (per SD)",0.356,-0.207,0.919,0.218
+"RUDAS","PM2.5","Age & sex adjusted","Age",0.004,-0.113,0.121,0.949
+"RUDAS","PM2.5","Age & sex adjusted","Sex (Male)",0,-1.497,1.497,1
+"RUDAS","PM2.5","Fully adjusted","PM2.5 (per SD)",0.291,-0.159,0.741,0.21
+"RUDAS","PM2.5","Fully adjusted","Age",0.035,-0.095,0.165,0.601
+"RUDAS","PM2.5","Fully adjusted","Sex (Male)",-1.342,-2.852,0.168,0.086
+"RUDAS","PM2.5","Fully adjusted","SES: NSE D",0.817,-2.411,4.045,0.621
+"RUDAS","PM2.5","Fully adjusted","SES: NSE C",1.263,-1.867,4.393,0.432
+"RUDAS","PM2.5","Fully adjusted","SES: NSE B",1.236,-1.779,4.251,0.424
+"RUDAS","PM2.5","Fully adjusted","SES: NSE A (Highest)",1.83,-1.261,4.921,0.25
+"RUDAS","PM2.5","Fully adjusted","bmi",0.004,-0.098,0.105,0.946
+"RUDAS","PM2.5","Fully adjusted","education_catprimary",0.162,-2.495,2.82,0.905
+"RUDAS","PM2.5","Fully adjusted","education_catsecondary_or_higher",-0.732,-3.045,1.582,0.537
+"RUDAS","PM2.5","Fully adjusted","civil_stat_catsingle",1.589,-0.507,3.685,0.142
+"RUDAS","PM2.5","Fully adjusted","civil_stat_catseparated_widowed",0.172,-1.387,1.732,0.829
+"RUDAS","PM2.5","Fully adjusted","occupation_cathomemaker",-3.1,-5.664,-0.537,0.021
+"RUDAS","PM2.5","Fully adjusted","occupation_catnot_employed",-0.755,-2.412,0.902,0.375
+"RUDAS","PM2.5","Fully adjusted","htn_cathypertension",0.193,-1.161,1.548,0.78
+"RUDAS","PM2.5","Fully adjusted","glucose_catPrediabetes",0.238,-1.615,2.091,0.802
+"RUDAS","PM2.5","Fully adjusted","glucose_catDiabetes",-0.253,-2.141,1.636,0.794
+"RUDAS","PM2.5","Fully adjusted","chronic_disSí",-2.02,-3.502,-0.538,0.009
+"RUDAS","PM2.5","Unadjusted","PM2.5 (per SD)",0.356,-0.193,0.905,0.207
+"RUDAS","Temperature","Age & sex adjusted","Temperature (per SD)",-0.42,-1.02,0.181,0.175
+"RUDAS","Temperature","Age & sex adjusted","Age",0.005,-0.112,0.122,0.931
+"RUDAS","Temperature","Age & sex adjusted","Sex (Male)",0.002,-1.49,1.493,0.998
+"RUDAS","Temperature","Fully adjusted","Temperature (per SD)",-0.375,-0.88,0.13,0.15
+"RUDAS","Temperature","Fully adjusted","Age",0.035,-0.096,0.166,0.604
+"RUDAS","Temperature","Fully adjusted","Sex (Male)",-1.39,-2.902,0.123,0.076
+"RUDAS","Temperature","Fully adjusted","SES: NSE D",0.739,-2.485,3.963,0.655
+"RUDAS","Temperature","Fully adjusted","SES: NSE C",1.22,-1.937,4.377,0.451
+"RUDAS","Temperature","Fully adjusted","SES: NSE B",1.222,-1.798,4.241,0.43
+"RUDAS","Temperature","Fully adjusted","SES: NSE A (Highest)",1.776,-1.423,4.974,0.28
+"RUDAS","Temperature","Fully adjusted","bmi",0.004,-0.099,0.107,0.938
+"RUDAS","Temperature","Fully adjusted","education_catprimary",0.265,-2.333,2.864,0.842
+"RUDAS","Temperature","Fully adjusted","education_catsecondary_or_higher",-0.585,-2.829,1.659,0.611
+"RUDAS","Temperature","Fully adjusted","civil_stat_catsingle",1.63,-0.456,3.717,0.13
+"RUDAS","Temperature","Fully adjusted","civil_stat_catseparated_widowed",0.151,-1.407,1.708,0.85
+"RUDAS","Temperature","Fully adjusted","occupation_cathomemaker",-3.206,-5.781,-0.631,0.017
+"RUDAS","Temperature","Fully adjusted","occupation_catnot_employed",-0.729,-2.401,0.942,0.395
+"RUDAS","Temperature","Fully adjusted","htn_cathypertension",0.18,-1.148,1.509,0.791
+"RUDAS","Temperature","Fully adjusted","glucose_catPrediabetes",0.103,-1.769,1.975,0.914
+"RUDAS","Temperature","Fully adjusted","glucose_catDiabetes",-0.332,-2.241,1.577,0.734
+"RUDAS","Temperature","Fully adjusted","chronic_disSí",-1.939,-3.469,-0.409,0.015
+"RUDAS","Temperature","Unadjusted","Temperature (per SD)",-0.419,-1.006,0.169,0.166

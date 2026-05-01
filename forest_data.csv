@@ -1,46 +1,46 @@
 "outcome","exposure","model","estimate","conf.low","conf.high","p.value","std.error","statistic","term"
 "DC binary","Humidity","Unadjusted",1.094,0.841,1.423,0.503,NA,NA,NA
 "DC binary","Humidity","Age & sex adjusted",1.098,0.853,1.414,0.469,NA,NA,NA
-"DC binary","Humidity","Fully adjusted",1.081,0.763,1.532,0.661,NA,NA,NA
+"DC binary","Humidity","Fully adjusted",1.201,0.917,1.572,0.184,NA,NA,NA
 "DC binary","PM10","Unadjusted",0.954,0.861,1.056,0.36,NA,NA,NA
 "DC binary","PM10","Age & sex adjusted",0.952,0.861,1.052,0.333,NA,NA,NA
-"DC binary","PM10","Fully adjusted",0.956,0.841,1.088,0.498,NA,NA,NA
+"DC binary","PM10","Fully adjusted",0.915,0.818,1.025,0.125,NA,NA,NA
 "DC binary","PM2.5","Unadjusted",0.942,0.834,1.064,0.336,NA,NA,NA
 "DC binary","PM2.5","Age & sex adjusted",0.948,0.844,1.065,0.37,NA,NA,NA
-"DC binary","PM2.5","Fully adjusted",0.967,0.829,1.128,0.667,NA,NA,NA
+"DC binary","PM2.5","Fully adjusted",0.952,0.849,1.068,0.405,NA,NA,NA
 "DC binary","Road distance (log)","Unadjusted",1.1063881311814,0.960616532083282,1.27428027307045,0.160742209185268,0.0720820171559402,1.40257969850027,"log_dist_road"
 "DC binary","Road distance (log)","Age & sex adjusted",1.07244186853861,0.929942858566922,1.23677659417374,0.336309774100986,0.0727399518601617,0.961482194224066,"log_dist_road"
-"DC binary","Road distance (log)","Fully adjusted",1.08869647462976,0.883550526866668,1.3414739483825,0.425008930449306,0.106524431211634,0.797761459850347,"log_dist_road"
+"DC binary","Road distance (log)","Fully adjusted",1.00490612547212,0.852898494663846,1.18400528002971,0.953360194857269,0.0836779929992683,0.0584876558631494,"log_dist_road"
 "DC binary","Temperature","Unadjusted",1.107,0.811,1.509,0.522,NA,NA,NA
 "DC binary","Temperature","Age & sex adjusted",1.142,0.835,1.56,0.406,NA,NA,NA
-"DC binary","Temperature","Fully adjusted",1.064,0.702,1.614,0.77,NA,NA,NA
+"DC binary","Temperature","Fully adjusted",1.158,0.828,1.619,0.391,NA,NA,NA
 "ACE","Humidity","Unadjusted",-0.186,-1.361,0.989,0.757,NA,NA,NA
 "ACE","Humidity","Age & sex adjusted",-0.103,-1.239,1.032,0.858,NA,NA,NA
-"ACE","Humidity","Fully adjusted",-0.559,-1.768,0.65,0.365,NA,NA,NA
+"ACE","Humidity","Fully adjusted",-0.397,-1.409,0.616,0.443,NA,NA,NA
 "ACE","PM10","Unadjusted",0.008,-0.419,0.436,0.969,NA,NA,NA
 "ACE","PM10","Age & sex adjusted",-0.023,-0.412,0.367,0.91,NA,NA,NA
-"ACE","PM10","Fully adjusted",0.144,-0.294,0.583,0.519,NA,NA,NA
+"ACE","PM10","Fully adjusted",0.083,-0.273,0.44,0.647,NA,NA,NA
 "ACE","PM2.5","Unadjusted",0.102,-0.399,0.603,0.69,NA,NA,NA
 "ACE","PM2.5","Age & sex adjusted",0.165,-0.295,0.625,0.482,NA,NA,NA
-"ACE","PM2.5","Fully adjusted",0.185,-0.32,0.69,0.472,NA,NA,NA
+"ACE","PM2.5","Fully adjusted",0.098,-0.327,0.524,0.651,NA,NA,NA
 "ACE","Road distance (log)","Unadjusted",-0.718541859788455,-1.37706782279235,-0.0600158967845569,0.0327878000821975,0.335982634185662,-2.13862797263323,"log_dist_road"
 "ACE","Road distance (log)","Age & sex adjusted",-0.924200242180293,-1.56507123491168,-0.283329249448908,0.00483113778924084,0.326974996291523,-2.82651656139572,"log_dist_road"
-"ACE","Road distance (log)","Fully adjusted",-0.658136278731119,-1.41828364446706,0.102011087004824,0.0902531214746122,0.387830288640787,-1.69696977778002,"log_dist_road"
+"ACE","Road distance (log)","Fully adjusted",-0.544992599025845,-1.15251125823209,0.0625260601804017,0.0791356655354292,0.309958499595024,-1.75827602642904,"log_dist_road"
 "ACE","Temperature","Unadjusted",0.346,-1.098,1.79,0.639,NA,NA,NA
 "ACE","Temperature","Age & sex adjusted",0.379,-0.971,1.729,0.582,NA,NA,NA
-"ACE","Temperature","Fully adjusted",0.87,-0.646,2.386,0.261,NA,NA,NA
+"ACE","Temperature","Fully adjusted",0.478,-0.718,1.673,0.434,NA,NA,NA
 "RUDAS","Humidity","Unadjusted",-0.83,-1.635,-0.026,0.046,NA,NA,NA
 "RUDAS","Humidity","Age & sex adjusted",-0.844,-1.657,-0.03,0.045,NA,NA,NA
-"RUDAS","Humidity","Fully adjusted",-0.942,-4.394,2.509,0.602,NA,NA,NA
+"RUDAS","Humidity","Fully adjusted",-0.612,-1.38,0.155,0.122,NA,NA,NA
 "RUDAS","PM10","Unadjusted",0.214,-0.051,0.48,0.117,NA,NA,NA
 "RUDAS","PM10","Age & sex adjusted",0.216,-0.051,0.483,0.117,NA,NA,NA
-"RUDAS","PM10","Fully adjusted",0.311,-0.462,1.083,0.446,NA,NA,NA
+"RUDAS","PM10","Fully adjusted",0.157,-0.062,0.377,0.164,NA,NA,NA
 "RUDAS","PM2.5","Unadjusted",0.208,-0.113,0.529,0.207,NA,NA,NA
 "RUDAS","PM2.5","Age & sex adjusted",0.208,-0.121,0.538,0.218,NA,NA,NA
-"RUDAS","PM2.5","Fully adjusted",0.479,-0.644,1.603,0.419,NA,NA,NA
+"RUDAS","PM2.5","Fully adjusted",0.17,-0.093,0.433,0.21,NA,NA,NA
 "RUDAS","Road distance (log)","Unadjusted",0.0692709046548034,-0.40229722703096,0.540839036340567,0.774082113824949,0.240595985553961,0.287913800786453,"log_dist_road"
 "RUDAS","Road distance (log)","Age & sex adjusted",0.0692427273453751,-0.403061913916926,0.541547368607676,0.774529267011084,0.240971755746072,0.287347897395664,"log_dist_road"
-"RUDAS","Road distance (log)","Fully adjusted",0.38341085809127,-1.46827855710829,2.23510027329083,0.692005018645534,0.944739497550796,0.40583765057484,"log_dist_road"
+"RUDAS","Road distance (log)","Fully adjusted",0.135147805581737,-0.387148147644217,0.657443758807691,0.613633833366692,0.266477527156099,0.507163988738793,"log_dist_road"
 "RUDAS","Temperature","Unadjusted",-0.712,-1.711,0.288,0.166,NA,NA,NA
 "RUDAS","Temperature","Age & sex adjusted",-0.713,-1.735,0.308,0.175,NA,NA,NA
-"RUDAS","Temperature","Fully adjusted",-1.358,-4.687,1.971,0.439,NA,NA,NA
+"RUDAS","Temperature","Fully adjusted",-0.638,-1.497,0.222,0.15,NA,NA,NA
