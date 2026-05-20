@@ -58,6 +58,8 @@ library(gtsummary)
 library(car)
 library(writexl)
 library(ggeffects)
+library(marginaleffects)
+
 
 
 recode <- dplyr::recode  # fix masking conflict
@@ -241,6 +243,44 @@ purpleair_all <- purpleair_all |>
     -pm10_0_atm_a, -pm10_0_atm_b,
     -voc, -voc_a, -voc_b
   )
+
+
+
+## Cleaning up the agreement plots
+
+# Shared sensor labels (reuse from before)
+sensor_labels <- c(
+  "180119" = "180119 – PuenteP Estadio",
+  "159005" = "159005 – MiPeru",
+  "180043" = "180043 – SanMa",
+  "159599" = "159599 – Comas",
+  "159435" = "159435 – Ventanilla",
+  "180021" = "180021 – Carab"
+)
+
+# PM2.5
+ggplot(monthly_ab, aes(month, sensor_id, fill = mean_diff_pm25)) +
+  geom_tile() +
+  scale_fill_viridis_c(name = "Mean A–B\nDifference\n(µg/m³)") +
+  scale_y_discrete(labels = sensor_labels) +
+  labs(
+    title = "PM2.5 A–B Channel Agreement by Sensor and Month",
+    x     = "Month",
+    y     = "Sensor"
+  ) +
+  theme_minimal()
+
+# PM10
+ggplot(monthly_ab, aes(month, sensor_id, fill = mean_diff_pm10)) +
+  geom_tile() +
+  scale_fill_viridis_c(name = "Mean A–B\nDifference\n(µg/m³)") +
+  scale_y_discrete(labels = sensor_labels) +
+  labs(
+    title = "PM10 A–B Channel Agreement by Sensor and Month",
+    x     = "Month",
+    y     = "Sensor"
+  ) +
+  theme_minimal()
 ```
 
 ## Visualizations: Processed Exposure Time Series
@@ -262,6 +302,42 @@ ggplot(plot_data, aes(x = datetime, y = value, color = sensor_id)) +
     x = NULL, y = NULL, color = "Sensor"
   ) +
   theme_minimal()
+
+
+## make a cleaner plot of above
+# Define sensor ID to name mapping
+sensor_labels <- c(
+  "180119" = "180119 – PuenteP Estadio",
+  "159005" = "159005 – MiPeru",
+  "180043" = "180043 – SanMa",
+  "159599" = "159599 – Comas",
+  "159435" = "159435 – Ventanilla",
+  "180021" = "180021 – Carab"
+)
+
+# Define cleaner facet labels
+var_labels <- c(
+  humidity_avg    = "Humidity (%)",
+  pm10_avg        = "PM10 (µg/m³)",
+  pm25_avg        = "PM2.5 (µg/m³)",
+  temperature_avg = "Temperature (°F)"
+)
+
+ggplot(plot_data, aes(x = datetime, y = value, color = sensor_id)) +
+  geom_line(alpha = 0.4, linewidth = 0.3) +
+  facet_wrap(~ variable, scales = "free_y", labeller = labeller(variable = var_labels)) +
+  scale_color_discrete(labels = sensor_labels) +
+  labs(
+    title = "PurpleAir Time Series (Post-QC Exposure Variables)",
+    x     = "Date",
+    y     = "Measurement Value",
+    color = "Sensor ID"
+  ) +
+  theme_minimal()
+
+##
+
+
 
 plot_data_capped <- plot_data |>
   group_by(variable) |>
@@ -3474,5 +3550,48 @@ ggplot(ses_dc, aes(x = ses_level, y = pct_dc)) +
     caption = "Error bars: 95% exact binomial confidence intervals"
   ) +
   theme_minimal()
+```
+
+
+
+
+## Figure to see how dementia (old and young) varies across sensor populations
+```{r}
+sensor_labels <- c(
+  "180119" = "180119 – PuenteP Estadio",
+  "159005" = "159005 – MiPeru",
+  "180043" = "180043 – SanMa",
+  "159599" = "159599 – Comas",
+  "159435" = "159435 – Ventanilla",
+  "180021" = "180021 – Carab"
+)
+
+dementia_sensor_plot <- spatial_data_proj %>%
+  count(nearest_sensor_id, dc_binary) %>%
+  group_by(nearest_sensor_id) %>%
+  mutate(pct = n / sum(n) * 100) %>%
+  ggplot(aes(x = factor(nearest_sensor_id), y = pct, fill = factor(dc_binary))) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = sprintf("%.1f%%", pct)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 3) +
+  scale_x_discrete(labels = sensor_labels) +
+  scale_fill_discrete(labels = c("0" = "No Dementia", "1" = "Dementia")) +
+  labs(x = "Sensor Zone", y = "Percentage (%)",
+       fill = "Dementia",
+       title = "Distribution of Cognitive Decline by Sensor Zone") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+dementia_sensor_plot
+```
+
+
+## Re: interaction term
+```{r}
+
+slopes(int_model, 
+       variables = "log_dist_road", 
+       by = "ses_level")
 ```
 
