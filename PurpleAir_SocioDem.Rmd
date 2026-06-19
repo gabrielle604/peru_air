@@ -59,6 +59,9 @@ library(car)
 library(writexl)
 library(ggeffects)
 library(marginaleffects)
+library(ggh4x)
+
+
 
 
 
@@ -237,6 +240,10 @@ sensitivity_delta <- sensitivity_results |>
 
 # 9. DROP RAW CHANNELS
 
+# save a raw copy
+purpleair_raw <- purpleair_all  # save raw copy before cleaning
+
+
 purpleair_all <- purpleair_all |>
   select(
     -pm2_5_atm_a, -pm2_5_atm_b,
@@ -281,6 +288,23 @@ ggplot(monthly_ab, aes(month, sensor_id, fill = mean_diff_pm10)) +
     y     = "Sensor"
   ) +
   theme_minimal()
+
+
+
+# SENSITIVITY: restrict to 2023 – June 2024 (pre-degradation period)
+purpleair_sensitivity_raw <- purpleair_raw |>
+  mutate(datetime = as.POSIXct(time_stamp, origin = "1970-01-01", tz = "UTC")) |>
+  filter(datetime < as.Date("2024-07-01")) |>
+  clean_purpleair_ab()
+
+sensor_exposure_sensitivity <- compute_exposure(purpleair_sensitivity_raw, 5, 0.70)
+
+
+
+
+sensor_exposure_final
+sensor_exposure_sensitivity
+
 ```
 
 ## Visualizations: Processed Exposure Time Series
@@ -1923,6 +1947,110 @@ buffer_summary |>
         axis.text.x = element_text(size = 8, angle = 20, hjust = 1),
         strip.text  = element_text(size = 10))
 ```
+
+## Request from Eder
+"can you use a y axis for the maximum value (ie., 100%, 30 points, and 100 points)? Thus, the bars are more proportional, and the visual comparison is better. Additionally, it would be interesting to know if a stratified by sensor analysis identified important differences"
+
+```{r}
+buffer_summary |>
+  pivot_longer(cols = c(pct_dc, mean_rudas, mean_ace),
+               names_to = "outcome", values_to = "value") |>
+  mutate(
+    outcome = recode(outcome,
+      pct_dc    = "% cognitive impairment",
+      mean_rudas = "mean RUDAS (out of 30)",
+      mean_ace   = "mean ACE (out of 100)"
+    ),
+    outcome = factor(outcome, levels = c(
+      "% cognitive impairment", "mean RUDAS (out of 30)", "mean ACE (out of 100)"
+    )),
+    y_max = case_when(
+      outcome == "% cognitive impairment" ~ 100,
+      outcome == "mean RUDAS (out of 30)" ~ 30,
+      outcome == "mean ACE (out of 100)"  ~ 100
+    )
+  ) |>
+  ggplot(aes(x = buffer_zone, y = value, fill = buffer_zone)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = round(value, 1)), vjust = -0.4, size = 3, color = "grey30") +
+  facet_wrap(~ outcome, scales = "free_y") +
+  scale_y_continuous(limits = function(x) c(0, max(x) * 1.1)) +
+  ggh4x::facetted_pos_scales(y = list(
+    outcome == "% cognitive impairment" ~ scale_y_continuous(limits = c(0, 100)),
+    outcome == "mean RUDAS (out of 30)" ~ scale_y_continuous(limits = c(0, 30)),
+    outcome == "mean ACE (out of 100)"  ~ scale_y_continuous(limits = c(0, 100))
+  )) +
+  scale_fill_manual(values = c(
+    "Within 100m" = "#B5D4F4",
+    "100–500m"    = "#85B7EB",
+    "500m–1km"    = "#378ADD",
+    "Beyond 1km"  = "#185FA5"
+  )) +
+  labs(
+    title   = "Cognitive outcomes by distance to nearest major road",
+    caption = "Distance to nearest trunk, primary, or secondary road (OpenStreetMap). Unadjusted means.",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 8, angle = 20, hjust = 1),
+        strip.text  = element_text(size = 10))
+```
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(buffer_zone = case_when(
+    dist_to_road_m <= 100  ~ "Within 100m",
+    dist_to_road_m <= 500  ~ "100–500m",
+    dist_to_road_m <= 1000 ~ "500m–1km",
+    TRUE                   ~ "Beyond 1km"
+  ),
+  buffer_zone = factor(buffer_zone,
+    levels = c("Within 100m", "100–500m", "500m–1km", "Beyond 1km"))) |>
+  group_by(nearest_sensor_name, buffer_zone) |>
+  summarise(
+    pct_dc     = mean(dc_binary, na.rm = TRUE) * 100,
+    mean_rudas = mean(rudas_n, na.rm = TRUE),
+    mean_ace   = mean(ace_n, na.rm = TRUE),
+    n          = n(),
+    .groups    = "drop"
+  ) |>
+  pivot_longer(cols = c(pct_dc, mean_rudas, mean_ace),
+               names_to = "outcome", values_to = "value") |>
+  mutate(outcome = recode(outcome,
+    pct_dc     = "% cognitive impairment",
+    mean_rudas = "mean RUDAS (out of 30)",
+    mean_ace   = "mean ACE (out of 100)"
+  )) |>
+  ggplot(aes(x = buffer_zone, y = value, fill = buffer_zone)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = paste0(round(value, 1), "\n(n=", n, ")")),
+            vjust = -0.3, size = 2.5, color = "grey30") +
+  facet_grid(nearest_sensor_name ~ outcome, scales = "free_y") +
+  scale_fill_manual(values = c(
+    "Within 100m" = "#B5D4F4",
+    "100–500m"    = "#85B7EB",
+    "500m–1km"    = "#378ADD",
+    "Beyond 1km"  = "#185FA5"
+  )) +
+  labs(
+    title   = "Cognitive outcomes by road distance, stratified by sensor zone",
+    caption = "Unadjusted means. n per cell shown on bars.",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x    = element_text(size = 7, angle = 25, hjust = 1),
+        strip.text     = element_text(size = 9))
+```
+
+
+
+
+
+
+
+
 
 ## Add in SES level
 
@@ -3593,5 +3721,40 @@ dementia_sensor_plot
 slopes(int_model, 
        variables = "log_dist_road", 
        by = "ses_level")
+```
+
+
+## Per Monica's question:
+The districts with lower employment rates is it because they are >65 years and not working? Might check this and mention if that’s the case
+
+
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(age_group_65 = ifelse(age_n >= 65, "65+", "<65")) |>
+  group_by(nearest_sensor_name, age_group_65) |>
+  summarise(
+    n = n(),
+    pct_not_employed = mean(occupation_cat == "not_employed", na.rm = TRUE) * 100,
+    pct_employed = mean(occupation_cat == "employed", na.rm = TRUE) * 100,
+    pct_homemaker = mean(occupation_cat == "homemaker", na.rm = TRUE) * 100,
+    .groups = "drop"
+  ) |>
+  arrange(nearest_sensor_name, age_group_65)
+```
+
+```{r}
+spatial_data_proj |>
+  st_drop_geometry() |>
+  mutate(age_65plus = age_n >= 65) |>
+  group_by(nearest_sensor_name) |>
+  summarise(
+    n = n(),
+    pct_65plus = mean(age_65plus, na.rm = TRUE) * 100,
+    pct_not_employed = mean(occupation_cat == "not_employed", na.rm = TRUE) * 100,
+    .groups = "drop"
+  ) |>
+  arrange(desc(pct_65plus))
 ```
 
